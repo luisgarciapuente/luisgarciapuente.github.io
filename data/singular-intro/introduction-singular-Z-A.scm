@@ -1,0 +1,6 @@
+(!definitely-latex)
+(!default-title "An introduction to Singular")
+(!last-page-number 0)
+(!last-modification-time 1185178553)
+(!head-line "")
+(!foot-line "\\folio")

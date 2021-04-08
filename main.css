@@ -1,0 +1,220 @@
+/* Global Elements */
+body { background-color: white;
+       margin: 5px;
+       padding: 0px;
+       font-family: Verdana, Arial, Helvetica, sans-serif }
+
+h1,h2,h3,h4 { font-family: verdana,arial,sans-serif;
+              font-style: italic; 
+              color: #508080; }
+h1,h2       { font-size: 150% }
+h4          { font-size: 115% }
+
+h2  { color: #006670; 
+      font-family: sans-serif; 
+      font-style:normal }
+h3  { color: #006670; 
+      font-family: sans-serif; 
+      font-style:normal }
+h1  { margin-top:-2px; 
+      color:#003366; 
+      font-style:normal }   /* ??? */
+
+
+/* Header
+----------------------------------------------------------------*/
+table.header             { background-color: darkgray; 
+                           line-height: 1.5 }
+table.header a           { text-decoration: none; 
+                           color: white }
+table.header a:hover     { color:black }
+
+
+/* Footer
+----------------------------------------------------------------*/
+HR { height: 2px; 
+     color: gray; 
+     border: none; } /* For Internet Explorer */
+HTML>BODY HR { height: 2px; 
+               background-color: gray; 
+               border: none; } /* For Gecko-based browsers */
+HTML>BODY HR { height: 2px; 
+               background-color: gray; 
+               border: 0px solid gray; } /* For Opera and Gecko-based browsers */
+table.footer    { font:sans-serif; 
+                  font-size:8pt }
+table.footer a  { text-decoration:none }
+table.footer a:link { color:#3D59AB }
+table.footer a:visited { color:#3D59AB }
+table.footer a:hover   { color:gray }
+
+
+/* Navigator
+----------------------------------------------------------------*/
+table.main_menu_top { font:sans-serif; 
+                      font-size:8pt; }
+td.tm a.off         { color: #003366;   
+                      background-color: #ADD8E6; 
+                      text-decoration:none; 
+                      padding: 2px}    /* hack for Netscape 4 */
+td.tm a.on          { color: black; 
+                      background-color: gray;
+                      text-decoration:none; 
+                      padding: 2px }
+td.tm a             { text-decoration: none;
+                      display:block;  
+                      padding: 0px; 
+                      width:100%; }
+body td.tm a { width: auto; }                             /* hack: IE needs width 100%, others auto */
+td.tm a:link    { color: #003366;  
+                  background-color: #ADD8E6; }
+/*  td.tm a:visited {color: #003366;   background-color: gray;} */
+td.tm a:hover   { color: #003366; 
+                  background-color: #CCCCCC; }
+td.tm a.on:link, td.tm a.on:visited { color: black; 
+                                      background-color: #CCCCCC; }
+/*begin add*/
+td.tm div { font-family:sans-serif;
+            border:1px solid #808080 }
+/*end add*/
+
+
+/* Mainbody 
+----------------------------------------------------------------*/
+div.path { color:#003366; 
+           margin-top:0px }
+div.path a:link, div.path a:visited { color:#44b;  
+                                      text-decoration:none; }
+div.path a:hover, div.path a:visited:hover  { color:#003366; }
+
+table.fr  { border:1px solid gray; 
+            border-collapse:collapse; }  
+table.fr td , table.fr th { border:1px solid gray; }   
+
+table.mainbody { font-family:sans-serif; 
+                 font-size:10pt; 
+                 color: black; }
+table.mainbody a:link, table.mainbody a:visited { text-decoration:none; 
+                                                  color:#44b }
+table.mainbody a:link:hover, table.mainbody a:visited:hover { text-decoration:underline; }
+td.header a { text-decoration:none }
+td.header a:link { color:#3D59AB }
+td.header a:visited { color:#3D59AB }
+td.header a:hover { color:gray }
+ul    { list-style-image: url(/images/arrow_gray.gif); } 
+ol    { list-style-image: none; } 
+ul.news { margin-left: 10px; 
+          padding-left: 0px; }
+span.alert {color:#3BAC60;
+            font-weight:bold} /* for news items we want to "alert" */
+
+.day  { font-family: verdana,arial,sans-serif; 
+        font-style: italic; 
+        color: #7A2A00; }  /*style of the "days" for seminars schedule*/
+
+/* Left Menu
+----------------------------------------------------------------*/
+td.lm a.off    { color: white;   
+                 background-color: #EDE3DA;}   /* hack for Netscape 4 */
+td.lm a.on     { color: #3D59AB }
+
+table.lmenu { font-family:sans-serif; }
+table.lmenu a { text-decoration: none; 
+                font-size:9pt; 
+                padding: 0px; 
+                width:100%; }
+body table.lmenu a { width: auto; }               /* hack: IE needs width 100%, others auto */
+table.lmenu a:link    { color: #424242; }
+table.lmenu a:visited { color: #424242; }
+table.lmenu a:hover   { color: #3D59AB; }
+table.lmenu a:active  { color: #3D59AB; }
+table.lmenu a.on:link, table.lmenu a.on:visited { color: #3D59AB; }
+
+
+/* Right Section
+----------------------------------------------------------------*/
+td.rightside                 { font-size: 8pt; 
+                           font-family:sans-serif,verdana }
+/*begin add*/
+table.talks td { background-color:#eaeff4; 
+                 border:1px solid #CCCCCC;
+                 font-size:8pt; 
+                 font-family:sans-serif }
+table.talks1 {   font-size:8pt; 
+                 font-family:sans-serif; }
+td.rightside .heading { color:#3BAC60; 
+                    font-size:larger } 
+td.rightside #seminar { color:#3366CC }
+/*end add*/
+
+
+
+/* not used 
+----------------------------------------------------------------*/
+/*
+.leftmenu_off {     font-size: 9pt;
+                    font-style: normal;
+                    font-weight: bold;
+                    color: #669999;
+                    text-decoration: none;
+                    margin-left: 4px;}
+.leftmenu_on {      font-size: 9pt; font-style: normal;
+                    font-weight: bold;
+                    color: #990000;
+                    text-decoration: none;
+                    margin-left: 4px;}
+.home_body_text {   font-size: 11pt;
+                    font-style: normal;
+                    line-height: 18px;
+                    font-weight: normal;
+                    color: #000000}
+.home_text_link {   font-size: 11pt;
+                    font-style: normal;
+                    line-height: 18pt;
+                    font-weight: normal;
+                    color: #990000}
+.footer_text {      font-size: 10pt;
+                    font-style: normal;
+                    line-height: 12pt;
+                    font-weight: normal;
+                    color: #000000}
+.footer_link {      font-size: 10pt;
+                    font-style: normal;
+                    line-height: 12pt;
+                    font-weight: normal;
+                    color: #FFFFFF}
+.left_menu2 {       font-size: 10pt;
+                    font-style: normal;
+                    font-weight: bold;
+                    color: #999999;
+                    margin-left: 4px;}
+.newsletter {       font-size: 10pt;
+                    font-style: normal;
+                    line-height: 14pt;
+                    font-weight: bold;
+                    color: #FFFFFF;
+                    margin-left: 4px;}
+.body_content {     font-size: 10pt;
+                    font-style: normal;
+                    line-height: 14pt;
+                    font-weight: normal;
+                    color: #000000}
+.body_content_link {font-size: 10pt; 
+                    font-style: normal; 
+                    line-height: 14pt; 
+                    font-weight: normal; 
+                    color: #990000}
+a.h                 {text-decoration: none; color: white}         
+div.box { background: beige; padding: 0.5em; border: none; }
+div.box h3 { color: white, background-color: #669999; width: 100%; }
+.small { font-size: smaller; }
+.test, .test a {font-family: verdana,arial,sans-serif; font-style: italic; color: #990000; }
+table.fr2  {border:2px solid gray; border-collapse:collapse;}  
+table.fr2 td , table.fr2 th {border:2px solid gray;}   
+
+table.index_left_menu {font: sans-serif; }
+table.index_left_menu a {text-decoration: none; font-size:9pt; width:100%; }
+table.index_left_menu a:link {color:#424242 }
+table.index_left_menu a:visited {color:#424242 }
+table.index_left_menu a:hover {color:#424242 }
+*/

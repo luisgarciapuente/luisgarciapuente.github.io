@@ -1,0 +1,617 @@
+<!doctype html public "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<!--
+
+Generated from introduction-singular.tex by tex2page, v 20070609
+(running on MzScheme 370, unix), 
+(c) Dorai Sitaram, 
+http://www.ccs.neu.edu/~dorai/tex2page/tex2page-doc.html
+
+-->
+<head>
+<title>
+An introduction to Singular
+</title>
+<link rel="stylesheet" type="text/css" href="introduction-singular-Z-S.css" title=default>
+<meta name=robots content="index,follow">
+</head>
+<body>
+<div id=slidetitle>
+<div align=right class=navigation></div>
+<p></p>
+
+<h1 class=title>An introduction to Singular
+
+</h1>
+<div align=center>
+Luis David Garcia-Puente<br>
+Department of Mathematics<br>
+Texas A&amp;M University
+</div>
+<p></p>
+
+<a name="node_sec_Temp_1"></a>
+<h1 class=section>Introduction</h1>
+<p>This document introduces Singular, which is a free computer algebra
+system for polynomial computations. You can download Singular
+at <a href="http://www.singular.uni-kl.de/">http://www.singular.uni-kl.de/</a>. Singular features one 
+of the fastest implementations of Buchberger&#8217;s algorithm to compute
+a Gr&ouml;bner basis. It also provides multivariate polynomial factorization,
+resultants, gcd computations, syzygy and free-resolution computations, 
+symbolic-numeric root finding, visualization, primary decomposition, resolution of singularities,
+and many more related functionalities.</p>
+<p>
+You cay run Singular either in shell mode by typing <tt>Singular</tt> in a terminal or by typing
+<tt>ESingular</tt>, which runs Singular within Xemacs adding some point-and-click functionality.
+Singular contains a C-like programming language that allows users to write their own libraries and
+procedures to extend Singular&#8217;s capabilities.</p>
+<p>
+</p>
+<a name="node_sec_1"></a>
+<h1 class=section>1&nbsp;&nbsp;First steps</h1>
+<p>Once Singular is started, it awaits an input after the prompt <code class=verbatim>&gt;</code>. Every statement has to be terminated by <code class=verbatim>;</code></p>
+<p>
+</p>
+<pre class=verbatim>2+2;
+// 4
+</pre><p></p>
+<p>
+All objects have a type, for example integer variables are of type <tt>int</tt>. An assignment is done by the 
+symbol <code class=verbatim>=</code>, comparison is done by the symbols <code class=verbatim>==</code> and <code class=verbatim>!=</code> (or <code class=verbatim>&lt;&gt;</code>), returning a Boolean variable (0 or 1).</p>
+<p>
+</p>
+<pre class=verbatim>int i = 2;
+i == 1;
+// 0
+i != 3;
+// 1
+</pre><p></p>
+<p>
+The value of an object is displayed by typing its name</p>
+<p>
+</p>
+<pre class=verbatim>i;
+// 2
+</pre><p></p>
+<p>
+The last displayed result is always available with the underscore symbol <code class=verbatim>_</code>. This is particularly useful
+if you are doing a long interactive computation and you forgot to store the result in a variable.</p>
+<p>
+</p>
+<pre class=verbatim>LIB &quot;general.lib&quot;;
+factorial(37);&quot;&quot;;                 //37! of type string (as long integer)
+ring r1 = 0,x,dp;
+factorial(37,0);       //37! of type number, computed in r1
+number p = _;
+p;
+// 13763753091226345046315979581580902400000000
+</pre><p>   </p>
+<p>
+The previous example shows many Singular features which are worth describing. The first line calls for a library
+called <tt>general.lib</tt>. Many Singular commands are stored in libraries that you need to load in order
+to use them. The command <tt>factorial</tt> returns a <tt>string</tt> if called with one argument. But once 
+a <tt>ring</tt> is defined, it returns a <tt>number</tt> if called with two arguments, a number is an element in the ground field (in this case <em>Q</em>).
+This shows that a single procedure
+can have a different number of inputs and different outputs as well. Furthermore, it exemplifies that most Singular objects
+need to be defined within the context of a  ring. Finally,
+text starting with <code class=verbatim>//</code> denotes a comment and is ignored in calculations.</p>
+<p>
+The best way to learn Singular is to read the online documentation either through Singular&#8217;s web site or 
+through the local copy included in the installation tarball. You can access this local copy by typing
+<code class=verbatim>help;</code>. Explanation on a single topic, e.g., on <tt>intmat</tt> which defines a matrix of integers, is
+obtained by</p>
+<p>
+</p>
+<pre class=verbatim>help intmat;
+</pre><p> </p>
+<p>
+Integers (<tt>int</tt>), integer matrices (<tt>intmat</tt>), integer vectors (<tt>intvec</tt>), 
+and strings (<tt>string</tt>) can be defined without a ring being active. Integer matrices are defined as follows</p>
+<p>
+</p>
+<pre class=verbatim>intmat m[3][3] = 1,2,3,4,5,6,7,8,9;
+</pre><p></p>
+<p>
+This line defines a 3&times; 3-matrix of integers and initializes it with some values.
+A single matrix entry may be selected and changed using square brackets [ and ].</p>
+<p>
+</p>
+<pre class=verbatim>m[1,2]=0;
+m;
+// 1,0,3,
+// 4,5,6,
+// 7,8,9
+print(m); // notice that the command print makes the output look nicer.
+//     1     0     3
+//     4     5     6
+//     7     8     9
+</pre><p></p>
+<p>
+To calculate the trace of this matrix, we use a <code class=verbatim>for</code> loop. 
+The curly brackets <code class=verbatim>{</code> and <code class=verbatim>}</code> denote the beginning and end of a block. 
+If you define a variable without giving an initial value, as the variable 
+tr in the example below, Singular assigns a default value for the specific type. 
+In this case, the default value for integers is 0. </p>
+<p>
+</p>
+<pre class=verbatim>int tr;
+for ( int j=1; j &lt;= 3; j++ ) { tr=tr + m[j,j]; }
+tr;
+// 15
+</pre><p></p>
+<p>
+Strings are delimited by <code class=verbatim>&quot;</code> (double quotes). They may be used to comment 
+the output of a computation or to give it a nice format. 
+If a string contains valid Singular commands, it can be executed using the function 
+<tt>execute</tt>. The result is the same as if the commands would have been 
+written on the command line. This feature is especially useful to define new rings inside procedures.</p>
+<p>
+</p>
+<pre class=verbatim>&quot;example for strings:&quot;;
+// example for strings:
+string s=&quot;The element of m &quot;;
+s = s + &quot;at position [2,3] is:&quot;;  // concatenation of strings by +
+s , m[2,3] , &quot;.&quot;;
+// The element of m at position [2,3] is: 6 .
+s=&quot;m[2,1]=0; m;&quot;;
+execute(s);
+// 1,0,3,
+// 0,5,6,
+// 7,8,9
+</pre><p></p>
+<p>
+This example shows that expressions can be separated by a <code class=verbatim>,</code> (comma) 
+giving a list of expressions. Singular evaluates each expression in this list and prints all results separated by spaces.</p>
+<p>
+You can plot curves and surfaces in Singular with the <tt>plot</tt> command in 
+the library <tt>surf.lib</tt>. So before we get to more technical stuff, 
+lets create some pretty pictures.  </p>
+<p>
+</p>
+<pre class=verbatim>LIB &quot;surf.lib&quot;;
+// plane curve
+ring r0 = 0,(x1,x2),dp;
+ideal I = x1^3 - x2^2;
+plot(I); 
+// Singular Logo 
+ring r = 0,(x,y,z),dp;
+poly logo = ((x+3)^3 + 2*(x+3)^2 - y^2)*(x^3 - y^2)*((x-3)^3-2*(x-3)^2-y^2);
+plot(logo);
+// Steiner surface
+ideal J2 = x^2*y^2+x^2*z^2+y^2*z^2-17*x*y*z;
+plot(J2);
+// Whitney umbrella
+plot(z^2-x^2*y);
+</pre><p></p>
+<p>
+</p>
+<a name="node_sec_2"></a>
+<h1 class=section>2&nbsp;&nbsp;Rings and Gr&ouml;bner bases</h1>
+<p>To calculate with objects such as ideals, matrices, modules, and polynomial vectors, a ring has to be defined first.</p>
+<p>
+</p>
+<pre class=verbatim>ring r = 0,(x,y,z),dp;
+</pre><p></p>
+<p>
+The definition of a ring consists of three parts: the first part determines the ground field, 
+the second part determines the names of the ring variables, and the third part determines the monomial ordering to be used. 
+The example above declares a polynomial ring called <tt>r</tt> with a ground field of characteristic 0 
+(i.e., the rational numbers) and ring variables called <em>x</em>, <em>y</em>, and <em>z</em>. The <tt>dp</tt> at the end means that the 
+degree reverse lexicographical ordering should be used.</p>
+<p>
+Other ring declarations:</p>
+<p>
+</p>
+<pre class=verbatim>ring r1=32003,(x,y,z),dp;
+//    characteristic 32003, variables x, y, and z and ordering dp. 
+ring r2=32003,(a,b,c,d),lp;
+//  characteristic 32003, variables a, b, c, d and lexicographical ordering
+</pre><p></p>
+<p>
+For the complete list of monomial orderings see <a href="http://www.singular.uni-kl.de/Manual/2-0-5/sing_364.htm">http://www.singular.uni-kl.de/Manual/2-0-5/sing_364.htm</a></p>
+<p>
+Typing the name of a ring prints its definition. The example below shows, that the default ring in 
+Singular is Z/32003[x,y,z] with degree reverse lexicographical ordering:</p>
+<p>
+</p>
+<pre class=verbatim>ring r5;
+r5;
+ //   characteristic : 32003
+ //   number of vars : 3
+ //        block   1 : ordering dp
+ //                  : names    x y z 
+ //        block   2 : ordering C
+</pre><p></p>
+<p>
+Defining a ring makes it the current active ring (Singular assigns it the variable  <code class=verbatim>basering</code>), so each ring definition above switches to a new basering. 
+The concept of rings in Singular is discussed in detail in the Chapter &#8220;Rings and orderings&#8221; of the Singular manual.</p>
+<p>
+The basering now is r5, to switch back to a different ring we need to use  
+the function setring:</p>
+<p>
+</p>
+<pre class=verbatim>setring r;
+</pre><p></p>
+<p>
+Once a ring is active, we can define polynomials. A monomial, say <em>x</em><sup>3</sup>, may be entered in two ways: 
+either as <code class=verbatim>x^3</code>, or in short-hand notation as <code class=verbatim>x3</code>. Note, that the short-hand notation is forbidden if 
+the name of the ring variable consists of more than one character. 
+Note also that Singular always expands brackets and automatically sorts the terms with respect to the monomial ordering of the basering.</p>
+<p>
+</p>
+<pre class=verbatim>poly f =  x3+y3+(x-y)*x2y2+z2;
+f;
+// x3y2-x2y3+x3+y3+z2
+</pre><p></p>
+<p>
+The command <tt>size</tt> determines in general the number of &#8220;single entries&#8221; in an object. 
+In particular, for polynomials, <tt>size</tt> determines the number of monomials.</p>
+<p>
+</p>
+<pre class=verbatim>size(f);
+// 5
+</pre><p></p>
+<p>
+A natural question is to ask if a point e.g. (<em>x</em>,<em>y</em>,<em>z</em>) = (1,2,0) lies on the variety defined by the polynomials <em>f</em> and <em>g</em>. 
+For this we define an ideal generated by both polynomials, substitute the coordinates of the point for the ring variables, 
+and check if the result is zero:</p>
+<p>
+</p>
+<pre class=verbatim>poly g =  f^2 *(2x-y);
+ideal I = f,g;
+ideal J= subst(I,var(1),1);
+J = subst(J,var(2),2);
+J = subst(J,var(3),0);
+J;
+// J[1]=5
+// J[2]=0
+</pre><p></p>
+<p>
+Since the result is not zero, the point (1,2,0) does not lie on the variety <em>V</em>(<em>f</em>,<em>g</em>).</p>
+<p>
+Another question is to decide whether some function vanishes on a variety, 
+or in algebraic terms if a polynomial is contained in a given ideal. For this we calculate 
+a Gr&ouml;bner basis using the command <tt>groebner</tt> and afterwards reduce the polynomial 
+with respect to this Gr&ouml;bner basis.</p>
+<p>
+</p>
+<pre class=verbatim>ideal sI = groebner(f);
+reduce(g,sI);
+// 0
+</pre><p></p>
+<p>
+As the result is 0 the polynomial <em>g</em> belongs to the ideal defined by <em>f</em>.</p>
+<p>
+The function <tt>groebner</tt>, like many other functions in Singular, prints a protocol during calculation, 
+if desired. The command <code class=verbatim>option(prot);</code> enables protocoling whereas <code class=verbatim>option(noprot);</code> turns it off.
+Another useful option for <tt>groebner</tt> is <code class=verbatim>option(redSB)</code> which forces Singular to return a <em>reduced</em>
+Gr&ouml;bner basis. In the Singular documentation, Gr&ouml;bner bases are referred to as <em>standard bases</em>. In fact, Singular provides also the command <code class=verbatim>std</code> to compute a standard basis. Below we will explain the difference between both commands. </p>
+<p>
+The command <tt>kbase</tt> calculates a basis of the polynomial ring modulo an ideal, 
+if the quotient ring is finite dimensional. As an example we calculate the Milnor number of a 
+hypersurface singularity in the global and local case. This is the vector space dimension of the polynomial ring modulo the 
+Jacobian ideal in the global case respectively of the power series ring modulo the Jacobian ideal in the local case. </p>
+<p>
+The Jacobian ideal is obtained with the command <tt>jacob</tt>.</p>
+<p>
+</p>
+<pre class=verbatim>ideal J = jacob(f);
+// // ** redefining J **
+J;
+// J[1]=3x2y2-2xy3+3x2
+// J[2]=2x3y-3x2y2+3y2
+// J[3]=2z
+</pre><p></p>
+<p>
+Singular prints the line <code class=verbatim>// ** redefining J **</code>. This indicates that we have previously defined a variable with 
+name <code class=verbatim>J</code>  of type ideal within the ring <code class=verbatim>r</code> (see above).</p>
+<p>
+To obtain a representing set of the quotient vector space we first calculate a Gr&ouml;bner basis, then 
+we apply the function <tt>kbase</tt> to this standard basis.</p>
+<p>
+</p>
+<pre class=verbatim>J = groebner(J);
+ideal K = kbase(J);
+K;
+// K[1]=y4
+// K[2]=xy3
+// K[3]=y3
+// K[4]=xy2
+// K[5]=y2
+// K[6]=x2y
+// K[7]=xy
+// K[8]=y
+// K[9]=x3
+// K[10]=x2
+// K[11]=x
+// K[12]=1
+//
+size(K);
+// 12
+</pre><p></p>
+<p>
+The command <tt>size</tt> gives the desired vector space 
+dimension. As in Singular the functions may take the input directly from earlier calculations, 
+the whole sequence of commands may be written in one single statement.</p>
+<p>
+</p>
+<pre class=verbatim>size(kbase(groebner(jacob(f))));
+// 12
+</pre><p></p>
+<p>
+When we are not interested in a basis of the quotient vector space, but only in the resulting dimension we may 
+even use the command <tt>vdim</tt> and write:</p>
+<p>
+</p>
+<pre class=verbatim>vdim(groebner(jacob(f)));
+// 12
+</pre><p></p>
+<p>
+</p>
+<a name="node_sec_2.1"></a>
+<h2 class=section>2.1&nbsp;&nbsp;Gr&ouml;bner bases for local orderings and multiplicities</h2>
+<p>The following is an example of a ring with the so-called &#8220;negative degree reverse lexicographical&#8221; local monomial ordering:</p>
+<p>
+</p>
+<pre class=verbatim>ring r=0,(x,y,z),ds; // ds is a local ordering
+</pre><p></p>
+<p>
+Define an ideal in this ring:</p>
+<p>
+</p>
+<pre class=verbatim> poly s1=x3-y*z;
+ poly s2=y3-x*z;
+ poly s3=z3-x*y;
+ ideal I=(s1,s2,s3);
+</pre><p></p>
+<p>
+A standard basis with respect to a local ordering is an analogue of a Gr&ouml;bner basis for global monomial orderings.
+One can use a standard basis to compute the multiplicity at the origin:</p>
+<p>
+</p>
+<pre class=verbatim> ideal J=std(I);
+ mult(J);
+// 11 
+</pre><p></p>
+<p>
+This multiplicity is the number of elements in the basis of standard monomials for the local quotient ring,
+which can be created as before:</p>
+<p>
+</p>
+<pre class=verbatim> ideal K = kbase(J);
+ K; 
+// K[1]=z4
+// K[2]=z3
+// K[3]=z2
+// K[4]=z
+// K[5]=y3
+// K[6]=y2
+// K[7]=y
+// K[8]=x3
+// K[9]=x2
+// K[10]=x
+// K[11]=1
+</pre><p></p>
+<p>
+</p>
+<a name="node_sec_3"></a>
+<h1 class=section>3&nbsp;&nbsp;Solving systems of polynomial equations</h1>
+<p>Singular applies symbolic-numeric methods to find the solutions of a system of polynomial equations. 
+Even though the complexity of these methods is higher than the complexity of purely numerical methods 
+it is desirable in many 
+cases, for example, to avoid troubles near singularities or to solve systems involving parameters providing
+a simultaneous solution for all parameter values. As a first example, we will solve the following 
+system of linear equations in <em>x</em>,<em>y</em>,<em>z</em>, and <em>u</em> with free parameters <em>a</em>,<em>b</em>,<em>c</em>, and <em>d</em>.  </p>
+<p>
+</p>
+<div class=mathdisplay align=center><img src="image-1.gif" border="0"></div>
+<p class=noindent>
+</p> 
+<p>
+</p>
+<pre class=verbatim>// define a ring with 4 parameters and 4 indeterminates
+ring R = (0,a,b,c,d), (x,y,z,u), dp;
+//
+//the equations
+//
+ideal I = 3x  + y   + z  - u  - a,
+          13x + 8y  + 6z - 7u - b,
+          14x + 10y + 6z - 7u - c,
+          7x  + 4y  + 3z - 3u - d;
+//
+// compute a reduced Groebner basis
+//
+option(redSB);
+ideal G = groebner(I);
+//
+// return the generators of G as monic polynomials
+//
+simplify(G,1);
+// _[1]=u+(6/5a+4/5b+1/5c-12/5d)
+// _[2]=z+(16/5a-1/5b+6/5c-17/5d)
+// _[3]=y+(3/5a+2/5b-2/5c-1/5d)
+// _[4]=x+(-6/5a+1/5b-1/5c+2/5d) 
+</pre><p></p>
+<p>
+So the unique solution to our system is</p>
+<p>
+</p>
+<div class=mathdisplay align=center><img src="image-2.gif" border="0"></div>
+<p class=noindent>
+</p>
+<p>
+The performance of Buchberger&#8217;s algorithm for computing Gr&ouml;bner bases depends
+heavily in the chosen term order. In general, lexicographic Gr&ouml;bner bases are the
+most expensive to compute. But if the ideal is zero-dimensional, that is, 
+the system has a finite number of solutions, we can use the <em>FGLM</em> algorithm
+to move from any Gr&ouml;bner basis to a lexicographic one. </p>
+<p>
+</p>
+<pre class=verbatim>LIB &quot;ring.lib&quot;;
+timer = 0;
+//
+ring R = 0, (x,y,z), dp;
+ideal I = x7+y7, y7+z7, x7+z7+2, x6y+y6z+z6+x;
+//
+// compute  reduced GB w.r.t. dp
+//
+option(redSB);
+ideal J=std(I);
+timer;
+// 4
+timer=0;
+//
+// define a new ring S by changing the term order of R 
+def S=changeord(&quot;lp&quot;);
+setring S;
+ideal J = fglm(R,J);
+timer;
+// 0
+timer=0;
+//
+// the command groebner decides on the best method to compute a GB
+// first we need to copy the original ideal I into the ring S
+ideal I =  imap(R,I);
+ideal K = groebner(I);
+timer;
+// 4
+timer=0;
+
+// finally the direct computation of a reduced lex Groebner basis  
+
+K = std(I);
+// .........................................................
+</pre><p></p>
+<p>
+The last computation takes a very long time so it is a good moment to point out
+that one forces Singular to quit with <code class=verbatim>^C-^C</code>. </p>
+<p>
+</p>
+<a name="node_sec_3.1"></a>
+<h2 class=section>3.1&nbsp;&nbsp;Elimination of variables</h2>
+<p>Elimination of variables is a common way to solve systems of polynomials.
+In Singular, one may either choose an appropriate ordering (for example, a product
+ordering) or apply the command <tt>eliminate</tt>, which computes in the
+present ordering modified by an extra weight vector.</p>
+<p>
+Next, we will determine all the <em>z</em>-values of the zeros
+of the following system of equations</p>
+<p>
+
+</p>
+<div class=mathdisplay align=center><img src="image-3.gif" border="0"></div>
+<p class=noindent>
+</p>
+<p>
+</p>
+<pre class=verbatim>// First we define a ring with a product ordering
+// to eliminate the first 2 variables
+ring R = 0, (x,y,z), (dp(2),lp);
+ideal I = 4z8y-5z3x-3x2y+xy2-8,
+          z9-3z5xy+z3x-(7x2+1)*y-2xy2-1,
+          z9x*(5+2y)+5z8y+5z-x2y-4xy2+1;
+option(redSB);
+ideal J = groebner(I);
+// find the univariate polynomial in z
+simplify(lead(J),1);
+// _[1]=z85
+// _[2]=y
+// _[3]=x
+poly g = J[1];
+</pre><p></p>
+<p>
+We will next compute all the zeros of the univariate polynomial <em>g</em>.
+We will use Laguerre&#8217;s algorithm in Singular implemented in the library
+<tt>solve.lib</tt>.</p>
+<p>
+</p>
+<pre class=verbatim>LIB &quot;solve.lib&quot;;
+// define a ring with complex coefficients to store the zeros
+ring Rfloat = (complex,10,I), (x,y,z), lp;
+poly g = imap(R,g);
+list L = laguerre_solve(g,100,100);
+size(L);
+// 85
+//
+// to pick the real zeros we can loop thru L
+for (int i=1; i&lt;=size(L); i++)
+{
+   if (impart(L[i])==0) {L[i];}
+}
+// -1.8135284651
+// -1.559997662
+// -0.2679041558
+// 0.9657875564
+// 1.1035140081
+// 1.2770264747
+// 2.7768083
+</pre><p></p>
+<p>
+As an exercise, implement a method to test that these points are indeed real zeros. 
+We could have found the roots of <em>g</em> without defining a new ring
+using the command <tt>solve</tt> in the library <tt>solve.lib</tt>.</p>
+<p>
+</p>
+<a name="node_sec_3.2"></a>
+<h2 class=section>3.2&nbsp;&nbsp;Primary decomposition</h2>
+<p>When solving a system of equations, it is important to understand the geometry
+of the zero-set. An important step towards this goal is finding the <em>primary decomposition</em>
+of the defining ideal. Singular provides different methods to find the primary decomposition
+of an ideal. One can used several canned-algorithms implemented in the library <tt>primdec.lib</tt>,
+or, in case those procedures fail to terminate, perform a manually-guided primary decomposition
+computing ideal saturations with the command <tt>sat</tt> included in the library <tt>elim.lib</tt>.</p>
+<p>
+Singular also provides an efficient implementation (<tt>facstd</tt>) of the factorizing Gr&ouml;bner bases algorithm.   
+This procedure returns a list of ideals whose intersection equals the radical of the input ideal. It is
+important to note that the decomposition returned by <tt>facstd</tt> is not a complete (irreducible) decomposition.
+It only splits the decomposition problem into smaller problems.</p>
+<p>
+The library <tt>primdec.lib</tt> contains two different algorithms to compute primary decomposition: the
+Gianni-Trager-Zacharias algorithm and the Shimoyama-Yokoyama algorithm. Below is a simple example on how
+to use this library.</p>
+<p>
+</p>
+<pre class=verbatim>LIB &quot;primdec.lib&quot;;
+ring R = 0, (x,y,z),dp;
+ideal I = xy2-y3-xy+y2,
+          x2y-x3,
+          x3-y3-x2+y2;
+primdecGTZ(I);
+//[1]:
+//   [1]:
+//      _[1]=x-y
+//   [2]:
+//      _[1]=x-y
+//[2]:
+//   [1]:
+//      _[1]=y-1
+//      _[2]=x2
+//   [2]:
+//      _[1]=y-1
+//      _[2]=x
+//[3]:
+//   [1]:
+//      _[1]=y
+//      _[2]=x2
+//   [2]:
+//      _[1]=y
+//      _[2]=x
+</pre><p>  </p>
+<p>
+</p>
+<a name="node_sec_Temp_2"></a>
+<h1 class=section>Acknowledgments</h1>
+<p>This tutorial relies heavily on the introductory Singular tutorial available online, 
+some introductory notes written by Anton Leykin and the paper &#8220;Singular: A computer
+algebra system&#8221; by Christoph Lossen. </p>
+<p>
+</p>
+<div class=smallskip></div>
+<p style="margin-top: 0pt; margin-bottom: 0pt">
+<div align=right class=navigation></div>
+</p>
+<p></p>
+<div align=right class=colophon>Last modified: Monday, July 23rd, 2007 3:15:53am<br><div align=right class=advertisement>HTML conversion by <a href="http://www.ccs.neu.edu/~dorai/tex2page/tex2page-doc.html">TeX2page 20070609</a></div></div>
+</div>
+</body>
+</html>

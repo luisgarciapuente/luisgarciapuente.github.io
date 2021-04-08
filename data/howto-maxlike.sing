@@ -1,0 +1,186 @@
+// Start by modifying the path were the library is
+// located in your home directory
+
+// In my case, the library is in the path
+LIB "~/likelihood/software/maxlike.lib";
+
+///////////////////////////////////////////////////
+//                                               //
+//      Parametric Maximization                  //
+//                                               //
+/////////////////////////////////////////////////// 
+
+// 1. 
+// First we create the ring we will be working with
+ring r = 0,(x,y),dp;
+
+// Now we input the polynomial parametrization of the distribution 
+poly f1,f2 = 7x+13y+23, -5x+7y-8;
+
+// We consider these polynomials as an ideal
+ideal I = f1,f2,1-f1-f2;
+
+// We define the data set as an integer vector
+intvec u = 11,23,31;
+
+// critical is a function that computes the critical ideal
+ideal J = critical(I,u);
+
+// Info returns two values (codimension, degree)
+Info(J);
+
+// The function MLeval has 4 parameters (the last one is optional).
+// The ideal I corresponding to the polynomial parametrization,
+// the critical ideal J, the data u, and
+// an optional parameter(s) corresponding to the options
+// for the "solve" command. In this example, the last option
+// stands for the precision of output in digits, which is 15.
+ 
+// MLeval returns a SORTED list whose entries are triplets of the form
+// (a,b,c) where a is a root of the critical ideal, 
+// b is the evaluation of the distribution at the MLE a
+// that is b = (f1(a),f2(a),f3(a),f4(a)),
+// c is the value of the ML at a, i.e., c = \prod_i f_i^{u_i}
+// Note: MLeval changes the ambient ring to a new ring called rC
+MLeval(I,J,u,15);
+
+// We can check the list of all root of J with the following command
+setring r;
+Lroots(J);
+
+// We can check the list of all real roots of J
+setring r;
+Lrealroots(J);
+
+///////////////////////////////////////////////////////
+///////////////////////////////////////////////////////
+
+// We can also go directly to the MLE computation
+// from the ideal I and the data u, as shown in
+//the next example
+
+// 2. 
+
+ring r = 0,(x,y),dp;
+poly f1,f2 = 7x+13y+23, -5x+7y-8;
+ideal I = f1,f2,1-f1-f2;
+intvec u = 11,23,31;
+
+// Since the critical ideal is 0 dimensional we can do all 
+// the steps in the algorithm at once with the command
+// MLE which takes as an input the ideal corresponding to
+// the  polynomial parametrization and the data set
+// (and an optional parameter(s) just as in MLeval.
+// The output consists of a list with two elements
+// the first element is equal to the output of MLeval.
+// The second element is the ML degree.
+MLE(I,u);
+
+/////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////
+ 
+// 3. First example in [Hosten-Khetan-Sturmfels]
+
+// The important part of this example is that
+// the critical ideal is not 0-dimensional
+// so we cannot use the command MLE directly.
+// First, we need to saturate the critical ideal
+// as explained in [Hosten-khetan-Sturmfels] 
+
+ring r = 0,(p,s,t),dp;
+poly f1 = p*(1-s)^4 + (1-p)*(1-t)^4;
+poly f2 = 4*p*s*(1-s)^3 + 4*(1-p)*t*(1-t)^3;
+poly f3 = 6*p*s^2*(1-s)^2 + 6*(1-p)*t^2*(1-t)^2;
+poly f4 = 4*p*s^3*(1-s) + 4*(1-p)*t^3*(1-t);
+poly f5 = p*s^4 + (1-p)*t^4;
+ideal I = f1,f2,f3,f4,f5;
+intvec u = 3,5,7,11,13;
+ideal J = critical(I,u);
+J = sat(J,s-t)[1];
+J = sat(J,p)[1];
+J = sat(J,p-1)[1];
+Info(J);
+list l = MLeval(I,J,u,15);
+l;
+
+///////////////////////////////////////////////////
+//                                               //
+//      Constrained Maximization                 //
+//                                               //
+/////////////////////////////////////////////////// 
+
+// 4. First example in [Hosten-Khetan-Sturmfels]
+//    Implicit Version
+
+// This example repeats the computation of example 3.
+// But this time we use the constrined optimization
+// approach starting from the implicit ideal instead 
+// of the parametrization.
+
+ring r = 0,(p0,p1,p2,p3,p4),dp;
+matrix P[3][3] = 
+  12*p0, 3*p1, 2*p2, 
+  3*p1, 2*p2, 3*p3, 
+  2*p2, 3*p3, 12*p4;
+
+ideal I = det(P);
+intvec u = 51,18,73,25,75;
+// The following function computes the Likelihood ideal 
+// of I given the data u
+
+ideal J = Lideal(I,u);
+Info(J);
+
+// The previous line shows that we neet to saturate by
+// the singular locus since the degree of J is 13 instead
+// of 12 which is the ML degree as reported in [HKS]
+
+ideal Q = slocus(I);
+J = sat(J,Q)[1];
+
+// Now, we need to add the condition that the sum of all 
+// probabilities is 1
+ideal m = maxideal(1);
+J = J,sum(m)-1;
+Info(J);
+
+// Finally, we use the function MLeval as explained 
+// in the previous examples.
+list l = MLeval(m,J,u);
+l;
+
+// 5. [Example 10, HKS]
+
+ring r = 0,(p00,p01,p02,p10,p11,p12,p20,p21,p22),dp;
+ideal m = maxideal(1);
+matrix P[3][3] = m;
+print(P);
+
+// This time we use the command minor() instead of
+// det() just to show how to obtain an ideal of minors
+// in Singular
+
+ideal I = minor(P,3);
+intvec u = 16,17,7,18,3,12,1,8,16;
+ideal J = Lideal(I,u);
+Info(J);
+ideal Q = slocus(I);
+J = sat(J,Q)[1];
+
+poly sumall = sum(m)-1;
+J = J+sumall;
+Info(J);
+
+list l = MLeval(m,J,u);
+l;
+
+// One can ask for all roots of the 
+// Likelihood ideal
+
+setring r;
+Lroots(J);
+
+// or the real root
+
+setring r;
+Lrealroots(J);

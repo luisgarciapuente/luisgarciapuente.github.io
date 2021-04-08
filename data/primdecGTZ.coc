@@ -1,0 +1,146 @@
+/*
+ZPrimDecGTZ Procedures
+ Author:	 Luis David Garcia
+ Date:           7 Nov 2002
+ CoCoA Version:  4.2
+
+ This algorithm works for characteristic zero.
+ It might work For "big enough" positive characteristic. But not with this implementation.
+ The PrimaryCheck needs To be fixed so that big prime characteristic is supported.
+ It computes the primary decomposition of a zero dimensional ideal.
+*/
+
+Define LinMap(Flag)
+  L := Indets();
+  N := NumIndets()-1;
+  If Flag = 0 Then
+    J := Rand(1,N);
+    P := Indet(J);
+  Elsif Flag = 1 Then 
+    P := Sum([Rand(0,1)*L[J] | J In 1..N]);
+  Else
+    P := Sum([Rand(1,5)*L[J] | J In 1..N]);
+  EndIf;
+  P := Indet(N+1) + P;
+  Return P;
+End; -- LinearCoordChange
+
+Define LinInv(P)
+  N := NumIndets();
+  Q := P;
+  Q := 2*Indet(N)-P;
+  Return Q;
+End;
+
+Define LexOrder(F,G)
+  Return LT(F) < LT(G);
+End; -- LexOrder
+
+Define PrimaryTest(I,P)
+  N := NumIndets();
+  Prime := Ideal(P);
+  Prime.GBasis := Prime.Gens;
+  J := SortedBy(I.Gens,Function('LexOrder'));
+  For M:=2 To Len(J) Do
+    Initial := LM(J[M]);
+    If Count(Log(Initial),0) = NumIndets()-1 Then
+      N := N-1;
+      E := Deg(Initial);
+      Quot := DivAlg(J[M] - Initial, [Indet(N)^(E-1)]);
+      Quot := Quot.Quotients;
+      Quot := Quot[1];
+      T := LC(Initial)*E*Indet(N) + Quot;
+      J[M] := E^E*LC(Initial)^(E-1)*J[M]; 
+      If NF(J[M]-T^E, Prime) = 0 Then
+	Coeff := [Num(C_) | C_ In Coefficients(T)];
+	Content := GCD(Coeff);
+	T := T/Content;
+	If LC(T) < 0 Then
+	  T := -T;
+	EndIf;
+	Prime := Prime + Ideal(T);
+	Prime.GBasis := Prime.Gens;
+     Else
+	Return Ideal(0);
+      EndIf;
+    EndIf;
+  EndFor;
+  Return Prime;
+End; -- PrimaryTest
+
+Define PrimDecGTZ(I)
+  RingCounter := 0;
+  Return ZeroPrimDecGTZ(I,RingCounter,0,0);
+End; -- PrimDecGTZ
+
+--Define PrimDecGTZ(I,Flag)
+--  Return ZeroPrimDecGTZ(I,0,Flag);
+--End;
+
+Define ZeroPrimDecGTZ(I, Var RingCounter, Flag, ChildProcess) 
+  Set FullRed;
+  N := NumIndets();
+  PDRingName := "RingForPrimaryDecomposition_" + Sprint(RingCounter);
+  Var(PDRingName) ::= CoeffRing[x[1..N]], Lex;
+  Using Var(PDRingName) Do
+    I_ := Image(I, RMap(x));
+    Result := []; Rest := [];
+    L := Indets();
+    L[N] := LinMap(Flag);
+    Phi := RMap(L);
+    L[N] := LinInv(L[N]);
+    PhiInv := RMap(L);
+    J := Image(I, Phi);
+    L[N] := Indet(N);
+    If IsHomog(Gens(J)) = 0 Then
+      HomPDR_ ::= CoeffRing[x[1..N],w], Lex;
+      Using HomPDR_ Do
+	HI := Image(J, RMap(x));
+        HI := Homogenized(w,HI);
+        HI.PSeries := Poincare(HomPDR_/HI);
+        ReducedGBasis(HI);
+      EndUsing;
+      J.GBasis := Image(HI.GBasis,RMap(Concat(L,[1])));
+      Clear HomPDR_; Destroy HomPDR_;
+    Else 
+      J.GBasis := ReducedGBasis(J);
+    EndIf;
+    Foreach T In J.GBasis Do
+      V := Log(LT(T));
+      Remove(V,N);
+      If IsZero(Vector(V)) Then
+	F := T;
+	Break;
+      EndIf;
+    EndForeach;
+    Fac := [K | K In Factor(F) And Deg(K[1]) > 0];
+    Foreach K In Fac Do
+      P := K[1]^K[2];
+      Primary := Ideal(ReducedGBasis(J+Ideal(P)));
+      Prime := PrimaryTest(Primary, K[1]);
+      If IsZero(Prime) Then
+	Append(Rest,I_ + Image(Ideal(P),PhiInv));
+      Else
+	Append(Result,[Ideal(ReducedGBasis(I_ + Image(Ideal(P),PhiInv))), Ideal(ReducedGBasis(Image(Prime,PhiInv)))]);
+      EndIf;
+    EndForeach;
+    Foreach K In Rest Do
+      RingCounter := RingCounter + 1;
+      If RingCounter = N Then
+	Flag := 1;
+      Elsif RingCounter = 2*N Then
+	Flag := 2;
+      EndIf;
+      Result := Concat(Result, ZeroPrimDecGTZ(K, RingCounter, Flag, 1)); 
+    EndForeach;
+  EndUsing;
+  If ChildProcess = 0 Then 
+    PrintLn "Ring counter ", RingCounter;
+  EndIf;
+  PrimaryDecomposition := Image(Result, RMap(Indets()));
+  Clear Var(PDRingName);
+  Destroy Var(PDRingName);
+  Return PrimaryDecomposition;
+End; -- ZeroPrimDecGTZ
+
+

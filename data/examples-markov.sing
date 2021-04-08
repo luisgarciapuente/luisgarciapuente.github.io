@@ -1,0 +1,65 @@
+LIB "~/likelihood/software/Markov.lib";
+
+/////////////////////////////////////////////////////////////////
+
+intvec d = 3,3,2,2; int n = size(d);
+probring(d);
+intvec d = 2,2,3,3; int n = size(d);
+probring(d);
+intvec v10 = 1,1,1,0,1,0; intmat m10 = bnet(n,v10); list l10 = localMarkov(m10);l10;
+list pw10 = pairMarkov(m10); pw10;
+list g10 = globalMarkov(m10); g10;
+ideal I10 = MarkovIdeal(l10,d); info(I10);
+ideal T10 = torideal(I10,d); 
+
+/////////////////////////////////////////////////////////////////
+
+intvec d = 2,2,2,2; int n = size(d);
+probring(d);
+
+intvec d = 3,3,3,3; int n = size(d);
+probring(d);
+
+intvec v15 = 1,1,0,0,1,1; intmat m15 = bnet(n,v15); 
+list l15 = localMarkov(m15);l15;
+list g15 = globalMarkov(m15);g15;
+ideal I15 = MarkovIdeal(l15,d); 
+
+/////////////////////////////////////////////////////////////////
+
+intvec d = 2,2,2,2; int n = size(d);
+probring(d);
+
+intvec v16 = 1,1,1,0,0,1; intmat m16 = bnet(n,v16); list l16 = localMarkov(m16);l16;
+list pw16 = pairMarkov(m16); pw16;
+list g16 = globalMarkov(m16);g16;
+ideal I16 = MarkovIdeal(l16,d); info(I16);
+ideal G16 = MarkovIdeal(g16,d); info(G16);
+ideal T16 = torideal(I16,d);
+
+ideal Q16 = sat(I16,T16)[1];
+list pd16 = primdecGTZ(Q16);
+
+/////////////////////////////////////////////////////////////////
+
+intvec d = 3,2,2,3; int n = size(d);
+probring(d);
+
+intvec v21 = 1,0,1,0,1,0; intmat m21 = bnet(n,v21); list l21 = localMarkov(m21);l21;
+list pw21 = pairMarkov(m21);pw21;
+list g21 = globalMarkov(m21);g21;
+ideal I21 = MarkovIdeal(l21,d); info(I21);
+ideal G21 = MarkovIdeal(g21,d); info(G21);
+ideal T21 = torideal(I21,d); 
+
+/////////////////////////////////////////////////////////////////
+
+intvec d = 2,2,2,2,2;
+int n = size(d);
+probring(d);
+
+intvec v138 = 1,1,0,1,0,0,0,1,1,1;
+intmat m138 = bnet(n,v138);
+list l138 = globalMarkov(m138);
+l138;
+ideal G138 = MarkovIdeal(l138,d);

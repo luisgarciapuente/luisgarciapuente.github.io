@@ -1,0 +1,274 @@
+// Luis David Garcia, last modified: 08.18.04
+///////////////////////////////////////////////////////////////////////////////
+version="$Id: maxlike.lib,v 1.0.0.0 2004/08/18 13:04:15 levandov Exp $";
+category="Algebraic Statistics";
+info="
+LIBRARY:  maxlike.lib     Maximum Likelihood Degree
+
+PROCEDURES:
+ Info(I)               I ideal. Displays codim, degree.
+More to come ...
+";
+
+LIB "presolve.lib";
+LIB "solve.lib";
+LIB "matrix.lib";
+LIB "sing.lib";
+//////////////////////////////////////////////////////////////////
+
+proc Info (ideal I)
+{
+  ideal J = groebner(I);
+  int c = nvars(basering) - dim(J);
+  int d = mult(J);
+  //  int s = size(minbase(I));
+  list l = c,d; //,s;
+  return(l);
+}
+
+proc myring (int n, list#) 
+{
+  if (size(#)==0 or size(#)>3) { #[1] = "0"; #[2] = "x"; #[3] = "dp";}
+  if (size(#)==1) { #[2] = "x"; #[3] = "dp";}
+  if (size(#)==2) { #[3] = "dp";}
+  int i = 1;
+  string ringconstructor = "ring nameofmyprettyring = " + #[1] + ",(" + #[2] + string(i);
+  for (i=2; i<=n; i++)
+    {
+      ringconstructor = ringconstructor + ",";
+      ringconstructor = ringconstructor + #[2] + string(i);
+    }
+  ringconstructor = ringconstructor + ")," + #[3] + ";";
+  execute(ringconstructor);
+  return(basering);
+}
+
+proc critical0 (ideal I, intvec u, list#)
+{
+  int i;
+  int d = nvars(basering);
+  int n = size(I);
+  matrix M1[n][n];
+  for (i=1; i<=n; i++)
+    {
+      M1[i,i] = I[i];
+    }
+  if (size(#)>0) { print(M1);}
+  matrix M2[d][n] = diff(maxideal(1),I);
+  if (size(#)>0) { print(M2);}
+  matrix M[n+d][n] = M1,M2;
+  M = transpose(M);
+  if (size(#)>0) { print(M);}
+  matrix K = syz(M);
+  if (size(#)>0) { K;}
+  matrix Zero[1][d];
+  matrix U[1][n+d] = transpose(u),Zero;
+  if (size(#)>0) {print(U)};
+  ideal Iu = U*K;
+  return(Iu);
+}
+
+proc critical (ideal I, intvec u, list#)
+{
+  int d = nvars(basering);
+  int n = size(I);
+  matrix M = concat(diag(I),jacob(I));
+  if (size(#)>0) { print(M);}
+  matrix K = syz(M);
+  if (size(#)>0) { K;}
+  matrix U[1][n+d] = u,0;
+  ideal Iu = U*K;
+  return(Iu);
+}
+
+proc Lroots (ideal J, list#)
+{
+  list points;
+  if (size(#)>0)
+    { 
+      if (typeof(#[1]) == "int")
+	{
+	  points = solve(J,#);
+	}
+      else
+	{
+          if (#[1] == "res")
+	    {
+	      points = ures_solve(J,delete(#,1));
+	    }
+	  if (#[1] == "fglm")
+	    {
+	      points = fglm_solve(J,delete(#,1));
+	    }
+	}
+    }
+  else
+    {
+      points = solve(J);  
+    }
+  keepring(basering);
+  return(points);
+}
+
+proc Lrealroots (ideal J,list#)
+{
+  int d = nvars(basering);
+  list roots = Lroots(J,#);
+  list reals;
+  int i,j;
+  int flag = 1;
+  for (i=1; i<=size(roots); i++)
+    { 
+      for (j=1; j<=d; j++)
+	{
+          if (leadcoef(roots[i][j]) != 0)
+	    { 	
+	      if (impart(leadcoef(roots[i][j])) != 0)
+		{
+		  flag = 0;
+		  break;
+		}
+	    }
+	}
+      if (flag == 1)
+	{
+	  reals = insert(reals,roots[i]);
+	}
+      flag = 1;
+    }
+  keepring(basering);
+  return(reals);
+}
+
+proc MLeval (ideal I, ideal J, intvec u, list#)
+{
+  def r_ = basering;
+  list l = Lrealroots(J,#);
+  ideal I = imap(r_,I);
+  int n = size(I);
+  int m = size(l);
+  int d = nvars(basering);
+  int i,j,k;
+  list res,values;
+  poly g,like;
+  int b;
+  for (i=1; i<=m; i++)
+    {
+      b = 1;
+      like = 1;
+      for (j=1; j<=n; j++)
+	{
+	  g = I[j];
+	  for (k=1; k<=d; k++)
+	    {
+	      g = subst(g,var(k),l[i][k]);
+	    }
+	  if (g < 0)
+	    {
+	      b=0;
+	      break;
+	    }
+	  else
+	    {
+	      values[j] = g;
+              like = like*g^u[j];
+	    }
+	}
+      if (b == 1)
+	{
+	  res = insert(res,list(l[i],values,like));
+	}
+    }
+  keepring(basering);
+  return(bubble(res));
+}
+
+proc MLE(ideal I, intvec u, list#)
+{
+  ideal J = critical(I,u);
+  int d = mult(groebner(J));
+  list res = MLeval(I,J,u,#);
+  keepring(basering);
+  return(bubble(res),d);
+}
+
+proc bubble(list l)
+{
+  int i,j;
+  list temp;
+  list ll = l; 
+  for (i = size(ll); i>0; i--)
+    {
+      for (j=1; j<i; j++)
+	{
+	  if (ll[j][3] > ll[j+1][3])
+	    {
+	      temp = ll[j];
+	      ll[j] = ll[j+1];
+	      ll[j+1] = temp;
+	    }
+	}
+    }
+  return(ll);
+}
+
+////////////////////////////////////////////////////////////////
+//                                                            //
+//            Implicit Likelihood Algorithm                   //
+//                                                            //
+////////////////////////////////////////////////////////////////
+
+
+proc likeideal(ideal I, intvec u)
+{
+  def r_ = basering;
+  int n = nvars(basering);
+  ideal P = groebner(I);
+  int c = n - dim(P);
+  //  ideal Q = slocus(P);
+  matrix Ones[1][n] = jacob(sum(maxideal(1)));
+  matrix J0 = jacob(P);
+  matrix J[size(P)+1][n] = Ones,J0;
+  matrix tJ = J*diag(maxideal(1));
+  qring qr = P;
+  matrix tJ = fetch(r_,tJ);
+  matrix K = syz(tJ);
+  K = reduce(K,std(0));
+  matrix U[1][n] = transpose(u);
+  ideal Iu = U*K;
+  setring r_;
+  ideal Iu = fetch(qr,Iu);
+  int i;
+  for (i=1; i<=n; i++)
+    {
+      Iu = sat(Iu,var(i))[1];
+    }
+  return(Iu);
+}  
+  
+proc Lideal(ideal I, intvec u)
+{
+  int n = nvars(basering);
+  ideal P = groebner(I);
+  int c = n - dim(P);
+  int s = size(P);
+  //  ideal Q = slocus(P);
+  matrix Ones[1][n] = jacob(sum(maxideal(1)));
+  matrix J0 = jacob(P);
+  matrix J[size(P)+1][n] = Ones,J0;
+  matrix tJ = J*diag(maxideal(1));
+  matrix G = outer(matrix(P),diag(1,s+1));
+  matrix M = concat(tJ,G);
+  matrix K = syz(M);
+  matrix U[1][n+s+s^2] = u,0;
+  ideal Iu = U*K;
+  int i;
+  for (i=1; i<=n; i++)
+    {
+      Iu = sat(Iu,var(i))[1];
+    }
+  Iu = sat(Iu,sum(maxideal(1)))[1];
+  return(Iu);
+}  
+
+      

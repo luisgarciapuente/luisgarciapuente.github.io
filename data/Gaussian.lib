@@ -1,0 +1,1599 @@
+// Luis David Garcia-Puente, last modified: 09/01/09
+///////////////////////////////////////////////////////////////////////////////
+version="$Id: Gaussian.lib,v 1.0.0.0 2009/09/01 12:59:15 levandov Exp $";
+category="Algebraic Statistics";
+info="
+LIBRARY:  Gaussian.lib     Algebraic for Gaussian Bayesian Networks
+
+PROCEDURES:
+ info(I)               ideal, displays codim, degree, #mingens.
+ bnet(n,u)              int, intvec, creates a nxn-matrix whose lower triangle is 
+                        given by the entries of u. Bayesian net in topological order. 
+ cartesian(L);          list, cartesian product of elements in the list.
+More to come ...
+";
+
+LIB "linalg.lib";
+LIB "Markov.lib";
+
+// The following are included in Markov.lib
+// LIB "general.lib";
+// LIB "elim.lib";
+// LIB "primdec.lib";
+// LIB "standard.lib";
+// LIB "presolve.lib";
+///////////////////////////////////////////////////////////////////////////////
+
+proc shift (intvec v)
+{
+  intvec myv = v;
+  int i;
+  for (i = 1; i<=size(myv); i++)
+    {
+      myv[i] = myv[i]-1;
+    }
+  return(myv);
+}
+
+proc msize (int n)
+{
+  return (n*(n-1)/2);
+}
+
+
+/* This procedure gets an intvec representing the lower triangle of a matrix
+   and returns the size of the matrix */ 
+
+proc Msize (intvec v)
+{
+  int n = size(v);
+  int k,i;
+  while (k!=n)
+    {
+      i++;
+      k = k+i;
+    }
+  return(i+1);
+}
+
+/* This procedure gets an intvec representing the upper triangle of a matrix
+   and returns the number of nonnegative entries */
+
+proc nonzerosize (intvec u)
+{
+  int i,k;
+  for (i=1; i<=size(u); i++)
+    {
+      if (u[i]!=0)
+	{
+	  k++;
+	}
+    }
+  return(k);
+}
+
+/* This procedure finds if a variable is in a polynomial */
+
+proc varinpoly (poly x, poly f)
+{
+  list L = variables(f);
+  int i;
+  int flag = 0;
+  for (i=1; i<=size(L); i++)
+    {
+      if (x == L[i])
+	{
+	  flag = 1;
+	  break;
+	}
+    }
+  return(flag);
+}
+
+/* Definition of the matrix corresponding to the Gaussian Bayesian Network.
+   In the lower triangle we encode the bidirected edges, in the
+   upper triangle we encode the directed edges.
+   The directed edges are stored from left to right. 
+   The bidirected edges are stored from top to bottom.
+   This procedure assumes that the DAG is in topological order
+   1 > 2 > ... > n */
+
+proc gbnet (intvec u, intvec v)
+{
+  int n = Msize(u);
+  int i,j,k;
+  intmat m[n][n];
+  for (i=1; i<n; i++)
+    {
+      for (j=i+1; j<=n; j++)
+	{
+	  k++;
+	  m[i,j] = u[k];
+	}
+    }
+  k = 0;
+  for (i=1; i<n; i++)
+    {
+      for (j=i+1; j<=n; j++)
+	{
+	  k++;
+	  m[j,i] = v[k];
+	}
+    }
+  return(m);
+}
+
+//////////////////////////////////////////////////////////////////
+/* Construction of the probability distribution ring */
+//////////////////////////////////////////////////////////////////
+
+proc Sring (int n, list #) 
+{
+  if (size(#)==0 or size(#)>3) { #[1] = "0"; #[2] = "s"; #[3] = "dp";}
+  if (size(#)==1) { #[2] = "s"; #[3] = "dp";}
+  if (size(#)==2) { #[3] = "dp";}
+  int i,j;
+  string ringconstructor = "ring nameofmyprettyring = " + #[1] + ",(";
+  for (i=1; i<=n; i++)
+    {
+      for (j=i; j<=n; j++)
+	{
+	  ringconstructor = ringconstructor + #[2] + string(i) + string(j);
+	  if (i!=n or j!=n)
+	    {
+	      ringconstructor = ringconstructor + ",";
+	    }
+	}
+    }
+  ringconstructor = ringconstructor + ")," + #[3] + ";";
+  execute(ringconstructor);
+  return(basering); 
+}
+example
+{
+  "EXAMPLE:";
+  echo = 2;
+  int n = 4;
+  def S = Sring(n);
+  S;
+}
+
+proc Pring (intvec v, list #) 
+{
+  int n = Msize(v);
+  intmat m = gbnet(v,v)+1;
+
+  if (size(#)==0 or size(#)>3) { #[1] = "0"; #[2] = "p"; #[3] = "dp";}
+  if (size(#)==1) { #[2] = "p"; #[3] = "dp";}
+  if (size(#)==2) { #[3] = "dp";}
+  int i,j;
+  string ringconstructor = "ring nameofmyprettyring = " + #[1] + ",(";
+  for (i=1; i<=n; i++)
+    {
+      for (j=i; j<=n; j++)
+	{
+	  if (m[i,j]!=0)
+	    {
+	      ringconstructor = ringconstructor + #[2] + string(i) + string(j);
+	      if (i!=n or j!=n)
+		{
+		  ringconstructor = ringconstructor + ",";
+		}
+	    }
+	}
+    }
+  ringconstructor = ringconstructor + ")," + #[3] + ";";
+  execute(ringconstructor);
+  return(basering); 
+}
+example
+{
+  "EXAMPLE:";
+  echo = 2;
+  intvec v = 0,1,0,0,1,0;
+  def P = Pring(v);
+  P;
+}
+
+proc Lring (intvec u, list #) 
+{
+  int n = Msize(u);
+  int counter;
+  int max = nonzerosize(u);
+  intvec v = 0:size(u);
+  intmat m = gbnet(u,v);
+
+  if (size(#)==0 or size(#)>3) { #[1] = "0"; #[2] = "l"; #[3] = "dp";}
+  if (size(#)==1) { #[2] = "l"; #[3] = "dp";}
+  if (size(#)==2) { #[3] = "dp";}
+  int i,j;
+  string ringconstructor = "ring nameofmyprettyring = " + #[1] + ",(";
+  for (i=1; i<=n; i++)
+    {
+      for (j=1; j<=n; j++)
+	{
+	  if (m[i,j]!=0)
+	    {
+	      ringconstructor = ringconstructor + #[2] + string(i) + string(j);
+	      counter++;
+	      if (counter<max)
+		{
+		  ringconstructor = ringconstructor + ",";
+		}
+	    }
+	}
+    }
+  ringconstructor = ringconstructor + ")," + #[3] + ";";
+  execute(ringconstructor);
+  return(basering); 
+}
+example
+{
+  "EXAMPLE:";
+  echo = 2;
+  intvec u = 1,1,0,0,1,1;
+  def L = Lring(u);
+  L;
+}
+
+/* This procedure checks if each entry in Lambda^{-1} is identifiable */
+
+proc identify (intvec u, intvec v, string dfile, string gfile, string ifile, string tfile, list #)
+{
+  if (size(#)==0 or size(#)>5) { #[1] = 1; #[2] = 1; #[3] = 1; #[4] = 1; #[5] = 1; }
+  if (size(#)==1) { #[2] = 1; #[3] = 1; #[4] = 1; #[5] = 1; }
+  if (size(#)==2) { #[3] = 1; #[4] = 1; #[5] = 1; }
+  if (size(#)==3) { #[4] = 1; #[5] = 1; }
+  if (size(#)==4) { if (#[4]==0) {#[5] = 1;} else {#[5]=0;} }
+
+  system("--ticks-per-sec",1000); 
+  // system("--min-time","0.01");
+
+  int i,j,k,vi,vj,vk,flag,ismonom,tiempo, tiempo_total, shell_code;
+  list out, trek_constraints, non_minor, list_single_door, list_instrumental, statement, list_back_door;
+  string texfilename,s,stex,tmp;
+
+  tiempo_total = timer;
+
+  int n = Msize(u);
+  intmat Pm = gbnet(v,v)+1;
+  intvec w = 0:size(u);
+  intmat Lm = gbnet(u,w);
+
+  link ld = ":w "+dfile; // .txt (maybe change to :a
+  link lg = ":w "+gfile; // .tex
+  link li = ":w "+ifile; // .sing
+  link lt = ":w "+tfile; // .txt
+
+  def S = Sring(n);
+  def P = Pring(v);
+  def L = Lring(u);
+  ring Q = 0,(q),dp;
+  def QS = Q+S;
+  def LP = L+P;
+  def SL = S+L;
+
+  def QSLP = QS+LP;
+  setring QSLP;
+  ideal Z;
+  poly current_var;
+
+  setring P;
+  matrix PM = Pm;
+  k = 1;
+  for (i=1; i<=n; i++)
+    {
+      for (j=i; j<=n; j++)
+	{
+	  if (PM[i,j]!=0)
+	    {
+	      PM[i,j] = var(k);
+	      if (i!=j)
+		{
+		  PM[j,i] = var(k);
+		}
+	      k++;
+	    }
+	}
+    }
+
+  setring L;
+  ideal t_e_vars, green_edges;
+  poly green;
+
+  matrix LM = Lm;
+  k = 1;
+  for (i=1; i<n; i++)
+    {
+      for (j=i+1; j<=n; j++)
+	{
+	  if (LM[i,j]!=0)
+	    {
+	      LM[i,j] = -var(k);
+	      k++;
+	    }
+	}
+    }
+  matrix Lambda = LM+1;
+  matrix Linv = inverse(Lambda);
+
+  setring LP;
+  ideal V = maxideal(1);
+  ideal qParam, t_e_vars;
+  poly h,term;
+  map f;
+  matrix Linv = imap(L,Linv);
+  matrix PM = imap(P,PM);
+  matrix LiPL = transpose(Linv)*PM*Linv;
+  ideal Param = LiPL[1,1..ncols(LiPL)];
+  for (i=2; i<=n; i++)
+    {
+      for (j=i; j<=n; j++)
+	{
+	  Param = Param,LiPL[i,j];
+	}
+    }
+
+  f = S,Param;
+  setring S;
+  tiempo = timer;
+  ideal K = kernel(LP,f);
+  tiempo = timer-tiempo;
+  fprintf(lt, "Model Implicitization Time: %s ms",tiempo);
+  write(lt,"");
+
+  if (K==0)
+    {
+      write(li,"/* ZERO IDEAL */");
+    }
+  else
+    {
+      tiempo = timer;
+      K = minbase(K);
+      tiempo = timer-tiempo;
+      fprintf(lt, "Minimal Base Model Implicitization Time: %s ms",tiempo);
+      write(lt,"");
+      write(li,"ring S=0,("+varstr(basering)+"),dp;");
+      fprintf(li,"ideal Constraints = %2s;;",K);
+      if (#[3])
+	{
+	  tiempo = timer;
+	  trek_constraints = trek_separation(u,v);
+	  tiempo = timer-tiempo;
+	  fprintf(lt, "Trek Separation Time: %s ms",tiempo);
+	  write(lt,"");
+	  tiempo = timer;
+	  ideal tI = trek_ideal(n,trek_constraints);
+	  tiempo = timer-tiempo;
+	  fprintf(lt, "Trek Ideal Time: %s ms",tiempo);
+	  write(lt,"");
+	  tiempo = timer;
+	  flag,non_minor = is_determinantal(K,tI);
+	  tiempo = timer-tiempo;
+	  fprintf(lt, "Check Determinantal Trek Ideal Time: %s ms",tiempo);
+	  write(lt,"");
+	  if (flag)
+	    {
+	      write(li, "");
+	      write(li, "/* All CONSTRAINTS ARE DETERMINANTAL */");
+	    }
+	  else
+	    {
+	      write(li, "");
+	      write(li, "/* NON-DETERMINANTAL CONSTRAINTS: */");
+	      write(li, "");
+	      fprintf(li, "list non_determinantal = %s;",non_minor);
+	    }
+	  write(li,"");
+	  write(li,"/* TREK SEPARATION: */");
+	  write(li,"");
+	  write(li,"/*");
+	  for (j=1; j<=size(trek_constraints); j++)
+	    {
+	      statement = trek_constraints[j];
+	      if (statement[3]==0 and statement[4]==0)
+		{
+		  fprintf(li,"{%s} _|_ {%s} | ({},{})",statement[1],statement[2]);
+		}
+	      else
+		{
+		  if (statement[3]!=0 and statement[4]!=0)
+		    {
+		      fprintf(li,"{%s} _|_ {%s} | ({%s},{%s})",statement[1],statement[2],statement[3],statement[4]);
+		    }
+		  else
+		    {
+		      if (statement[3]!=0)
+			{
+			  fprintf(li,"{%s} _|_ {%s} | ({%s},{})",statement[1],statement[2],statement[3]);
+			}
+		      else
+			{
+			  fprintf(li,"{%s} _|_ {%s} | ({},{%s})",statement[1],statement[2],statement[4]);
+			}
+		    }
+		}
+	    }
+	  write(li,"*/");
+	}
+    }
+  
+  setring QS;
+  ideal K = imap(S,K);
+  qring qQS = std(K);
+  ideal Z;
+  
+  setring LP;
+  
+  if (#[4])
+    {
+      texfilename = gfile[1..size(gfile)-4];
+      write(lg, "\\input{graph-top}");
+      if (#[1])
+	{
+	  write(lg, "\\colorverticestrue");
+	}
+      
+      for (i=1; i<=size(V); i++)
+	{
+	  s = varstr(i);
+	  write(lt,"Parameter: "+s);
+	  write(lt,"");
+	  h = V[i];
+	  qParam = h,Param;
+	  f = qQS,qParam;
+	  setring qQS;
+	  tiempo = timer;
+	  Z = kernel(LP,f);
+	  tiempo = timer-tiempo;
+	  fprintf(lt, "Parameter Identification Time: %s ms",tiempo);
+	  write(lt,"");
+	  tiempo = timer;
+	  Z = groebner(Z);
+	  tiempo = timer-tiempo;
+	  fprintf(lt, "Groebner Basis Parameter Identification Time: %s ms",tiempo);
+	  write(lt,"");
+	  if (Z==0) 
+	    {
+	      //write(ld,"PARAMETER: "+s+" NOT IDENTIFIABLE");
+	      write(ld,"PARAMETER: "+s);
+	      write(ld,"");
+	      stex = edgecolor(s,0);
+	      write(lg,stex);
+	    }
+	  else
+	    {
+	      if (s[1] == "l")
+		{
+		  setring L;
+		  green = imap(LP,h);
+		  green_edges = green_edges + green;
+		}
+	      write(ld,"PARAMETER: "+s+" IDENTIFIABLE");
+	      write(ld, "");
+	      write(ld,"EQUATIONS:");
+	      write(ld, "");
+	      setring QSLP;
+	      Z = imap(qQS,Z);
+	      current_var = imap(LP,h);
+	      Z = subst(Z,q,current_var);
+	      fprintf(ld,"%2s",Z);
+	      stex = edgecolor(s,1);
+	      write(lg,stex);
+	      if (s[1] == "l")
+		{
+		  tmp = "vi = "+s[2]+";";
+		  execute(tmp);
+		  tmp = "vj = "+s[3]+";";
+		  execute(tmp);
+		  tiempo = timer;
+		  flag, list_single_door = single_door(vi, vj, u, v);
+		  tiempo = timer-tiempo;
+		  fprintf(lt, "Single Door Time: %s ms",tiempo);
+		  write(lt,"");
+		  if (flag)
+		    {
+		      write(ld, "SINGLE_DOOR CRITERION:");
+		      write(ld, "");
+		      for (j=1; j<=size(list_single_door); j++)
+			{
+			  statement = list_single_door[j];
+			  fprintf(ld,"{%s} _|_ {%s} | {%s}",statement[1],statement[2],statement[3]);
+			}
+		      write(ld, "");	   
+		    }
+		  tiempo = timer;
+		  flag, list_instrumental = instrumental_variable(vi, vj, u, v);
+		  tiempo = timer-tiempo;
+		  fprintf(lt, "Instrumental Variable Time: %s ms",tiempo);
+		  write(lt,"");
+		  if (flag)
+		    {
+		      write(ld, "INSTRUMENTAL VARIABLE:");
+		      write(ld, "");
+		      for (j=1; j<=size(list_instrumental); j++)
+			{
+			  statement = list_instrumental[j];
+			  fprintf(ld,"%s | {%s} ",statement[1],statement[2]);
+			}
+		      write(ld, "");	   
+		    }
+		}
+	    }
+	  setring LP;
+	}
+      if (n<5)
+	{
+	  fprintf(lg, "\\input{graph%s}",n);
+	}
+      else
+	{
+	  if (nonzerosize(u)<=n / 2 and nonzerosize(v)<=n / 2) 
+	    {
+	      fprintf(lg, "\\input{graph%sline}",n);
+	    }
+	  else
+	    {
+	      fprintf(lg, "\\input{graph%s}",n);
+	    }
+	}
+      tiempo = timer;
+      shell_code = system("sh","/usr/texbin/pdflatex "+gfile+" > /dev/null");
+      shell_code = system("sh","rm "+texfilename+".aux "+texfilename+".log ");
+      shell_code = system("sh","/usr/texbin/pdfcrop --margins -4 "+texfilename+".pdf "+texfilename+".pdf > /dev/null");
+      shell_code = system("sh","convert -density 600 -units PixelsPerInch -quality 90 -depth 8 -resize 800x800 "+texfilename+".pdf "+texfilename+".png");
+      tiempo = timer-tiempo;
+      fprintf(lt, "LaTeX Time: %s ms",tiempo);
+      write(lt,"");
+      if (#[2])
+	{
+	  shell_code = system("sh","open "+texfilename+".pdf");
+	}
+    }
+  
+  if (#[5])
+    {
+      for (i=1; i<n; i++)
+	{
+	  for (j=i+1; j<=n; j++)
+	    {
+	      h = Linv[i,j];
+	      ismonom = 0;
+	      if (deg(h)>1)
+		{
+		  if (size(h)==1)
+		    {
+		      ismonom = 1;
+		    }
+		  s = string(h);
+		  t_e_vars = variables(h);
+		  setring L;
+		  t_e_vars = imap(LP,t_e_vars);
+		  if (quotient(green_edges,t_e_vars)==1)
+		    {
+		      fprintf(lt,"Total Effect of X%s on X%s: "+s, i, j);
+		      write(lt,"");
+		      fprintf(ld,"TOTAL EFFECT OF X%s ON X%s: "+s+" IDENTIFIABLE", i, j);	
+		      write(ld,"");
+		      write(ld, "EACH PARAMETER IDENTIFIABLE");
+		      write(ld,"");
+		      tiempo = timer;
+		      flag, list_back_door = back_door(i,j,u,v);
+		      tiempo = timer-tiempo;
+		      fprintf(lt, "Back Door Time: %s ms",tiempo);
+		      write(lt,"");
+		      if (flag)
+			{
+			  write(ld, "BACK_DOOR CRITERION:");
+			  write(ld, "");
+			  for (k=1; k<=size(list_back_door); k++)
+			    {
+			      statement = list_back_door[k];
+			      fprintf(ld,"{%s} _|_ {%s} | {%s}",statement[1],statement[2],statement[3]);
+			    }
+			  write(ld, "");	   
+			}
+		      setring LP;
+		    }
+		  else
+		    {
+		      setring LP;
+		      qParam = h,Param;
+		      f = qQS,qParam;
+		      setring qQS;
+		      fprintf(lt,"Total Effect of X%s on X%s: "+s, i, j);
+		      write(lt,"");
+		      tiempo = timer;
+		      Z = kernel(LP,f);
+		      tiempo = timer-tiempo;
+		      fprintf(lt, "Total Effect Identification Time: %s ms",tiempo);
+		      write(lt,"");
+		      tiempo = timer;
+		      Z = groebner(Z);
+		      tiempo = timer-tiempo;
+		      fprintf(lt, "Groebner Basis Total Effect Identification Time: %s ms",tiempo);
+		      write(lt,"");
+		      if (Z==0) 
+			{
+			  fprintf(ld,"TOTAL EFFECT OF X%s ON X%s: "+s, i, j);
+			  write(ld,"");
+			}
+		      else
+			{
+			  fprintf(ld,"TOTAL EFFECT OF X%s ON X%s: "+s+" IDENTIFIABLE", i, j);	
+			  write(ld,"");
+			  write(ld,"EQUATIONS:");
+			  write(ld, "");
+			  setring QSLP;
+			  Z = imap(qQS,Z);
+			  current_var = imap(LP,h);
+			  Z = subst(Z,q,current_var);
+			  fprintf(ld,"%2s",Z);
+			  tiempo = timer;
+			  flag, list_back_door = back_door(i,j,u,v);
+			  tiempo = timer-tiempo;
+			  fprintf(lt, "Back Door Time: %s ms",tiempo);
+			  write(lt,"");
+			  if (flag)
+			    {
+			      write(ld, "BACK_DOOR CRITERION:");
+			      for (k=1; k<=size(list_back_door); k++)
+				{
+				  statement = list_back_door[k];
+				  fprintf(ld,"{%s} _|_ {%s} | {%s}",statement[1],statement[2],statement[3]);
+				}
+			      write(ld, "");	   
+			    }
+			}
+		      setring LP;
+		      while (ismonom==0 and deg(h)>1) 
+			{
+			  term = leadmonom(h);
+			  s = string(term);
+			  fprintf(lt,"Partial Effect of X%s on X%s: "+s, i, j);
+			  write(lt,"");
+			  h = h - lead(h);
+			  qParam = term,Param;
+			  f = qQS,qParam;
+			  setring qQS;
+			  tiempo = timer;
+			  Z = kernel(LP,f);
+			  tiempo = timer-tiempo;
+			  fprintf(lt, "Partial Effect Identification Time: %s ms",tiempo);
+			  write(lt,"");
+			  tiempo = timer;
+			  Z = groebner(Z);
+			  tiempo = timer-tiempo;
+			  fprintf(lt, "Groebner Basis Partial Effect Identification Time: %s ms",tiempo);
+			  write(lt,"");
+			  if (Z==0) 
+			    {
+			      fprintf(ld,"PARTIAL EFFECT OF X%s ON X%s: "+s, i, j);
+			      write(ld,"");
+			    }
+			  else
+			    {
+			      fprintf(ld,"PARTIAL EFFECT OF X%s ON X%s: "+s+" IDENTIFIABLE", i, j);
+			      write(ld,"");
+			      write(ld,"EQUATIONS:");
+			      write(ld, "");
+			      setring QSLP;
+			      Z = imap(qQS,Z);
+			      current_var = imap(LP,term);
+			      Z = subst(Z,q,current_var);
+			      fprintf(ld,"%2s",Z);
+			    }
+			  setring LP;
+			}
+		    }
+		}
+	    }
+	}
+    }
+  tiempo_total = timer - tiempo_total;
+  fprintf(lt, "TOTAL TIME: %s ms",tiempo_total);
+}
+
+proc edgecolor (string s, int flag)
+{
+  string out;
+  if (s[1] == "l")
+    {
+      out = "\\lambda";
+    }
+  if (s[1] == "p")
+    {
+      out = "\\phi";
+    }
+  if (s[2] == "1")
+    {
+      out = out+"one";
+    }
+  if (s[2] == "2")
+    {
+      out = out+"two";
+    }
+  if (s[2] == "3")
+    {
+      out = out+"three";
+    }
+  if (s[2] == "4")
+    {
+      out = out+"four";
+    }
+  if (s[2] == "5")
+    {
+      out = out+"five";
+    }
+  if (s[2] == "6")
+    {
+      out = out+"six";
+    }
+  if (s[2] == "7")
+    {
+      out = out+"seven";
+    }
+  if (s[3] == "1")
+    {
+      out = out+"one";
+    }
+  if (s[3] == "2")
+    {
+      out = out+"two";
+    }
+  if (s[3] == "3")
+    {
+      out = out+"three";
+    }
+  if (s[3] == "4")
+    {
+      out = out+"four";
+    }
+  if (s[3] == "5")
+    {
+      out = out+"five";
+    }
+  if (s[3] == "6")
+    {
+      out = out+"six";
+    }
+  if (s[3] == "7")
+    {
+      out = out+"seven";
+    }
+  if (flag==1)
+    {
+      out = out+"green";
+    }
+  if (flag==0)
+    {
+      out = out+"red";
+    }
+  out = out+"true";
+  return(out);
+}
+
+proc trek_separation (intvec u, intvec v)
+{
+  int i,j,k;
+  int n = Msize(u);
+  int N = 2*n;
+  intmat m = gbnet(u,v);  
+  intmat M[N][N];
+  intvec a,b,ca,cb;
+  list PRIME,A,B,C,CA,CB,X,Y,Z,output,s;
+
+  for (i=1; i<=n; i++)
+    {
+      PRIME[i] = n-i+1;
+    }
+
+  for (i=1; i<n; i++)
+    {
+      for (j=i+1; j<=n; j++)
+	{
+	  M[i,j] = m[PRIME[j],PRIME[i]];
+	  M[i+n,j+n] = m[i,j];
+	}
+    }
+  for (i=1; i<=n; i++)
+    {
+      M[i,2*n-i+1] = 1;
+    }
+  for (i=2; i<=n; i++)
+    {
+      for (j=1; j<i; j++)
+	{
+	  if (m[i,j])
+	    {
+	      M[PRIME[i],n+j] = 1;
+	      M[PRIME[j],n+i] = 1;
+	    }
+	}
+    }
+  M = M+1;
+
+  for (i=1; i<=n; i++)
+    {
+      X[i] = i;
+      Y[i] = n+i;
+    }
+  Z = X+Y;
+  for (i=1; i<=2^n-1; i++)
+    {
+      B = subset(i,Y);
+      for (j=0; j<=2^N-1; j++)
+	{
+	  C = subset(j,Z);
+	  if (size(C)<size(B))
+	    {
+	      A = separate(B,C,M);
+	      if (size(A)>size(C))
+		{
+		  CA = list();
+		  CB = list();
+		  ca = 0;
+		  cb = 0;
+		  for (k=1; k<=size(C); k++)
+		    {
+		      if (C[k]<=n)
+			{
+			  CA = insert(CA,C[k],size(CA)); 
+			}
+		      else
+			{
+			  CB = insert(CB,C[k],size(CB)); 
+			}
+		    }
+       
+		  a = PRIME[A[1]];
+		  b = B[1]-n;
+		  for (k=2; k<=size(A); k++)
+		    {
+		      a = PRIME[A[k]],a;
+		    } 
+		  for (k=2; k<=size(B); k++)
+		    {
+		      b = b,B[k]-n;
+		    }
+		  s = a,b;
+		  if (size(CA)!=0)
+		    {
+		      ca = PRIME[CA[1]];
+		      for (k=2; k<=size(CA); k++)
+			{
+			  ca = PRIME[CA[k]],ca;
+			} 
+		    }
+		  s = insert(s,ca,size(s));
+		  if (size(CB)!=0)
+		    {
+		      cb = CB[1]-n;
+		      for (k=2; k<=size(CB); k++)
+			{
+			  cb = cb,CB[k]-n;
+			} 
+		    }
+		  s = insert(s,cb,size(s));
+		  //  "statement s",s;
+		  // "output list";output;
+		  output = add_statement(s,output);
+		  //  "output list after add_statement";output;
+		}
+	    }
+	}
+    }
+  return(output);
+}
+
+proc separate (list B, list C, intmat M)
+{
+  int i,j,k,d,flag;
+  int N = ncols(M);
+  int n = N/2;
+  list A,CA,CB;
+  list BB = B;
+  intmat MC = M;
+
+ for (i=1; i<=size(C); i++)
+    {
+      for (j=1; j<=n; j++)
+	{
+	  MC[j,C[i]] = 0;
+	  MC[C[i],n+j] = 0;
+	}
+    }
+
+ while (2^d <= N)
+    {
+      d++;
+    }
+
+  for (i=1; i<=d; i++)
+    {
+      MC = MC*MC;
+    }
+  
+  for (k=1; k<=size(C); k++)
+    {
+      if (C[k]<=n)
+	{
+	  CA = insert(CA,C[k],size(CA)); 
+	}
+      else
+	{
+	  CB = insert(CB,C[k],size(CB)); 
+	}
+    }
+
+  if (size(CB)!=0)
+    {
+      for (i=1; i<=size(BB); i++)
+	{
+	  for (j=1; j<=size(CB); j++)
+	    {
+	      if (BB[i]==CB[j])
+		{
+		  BB = delete(BB,i);
+		  i--;
+		  break;
+		}
+	    }
+	}
+    }
+
+  intvec b = BB[1..size(BB)];
+  intmat m[n][size(b)] = MC[1..n,b];
+
+  for (i=1; i<=n; i++)
+    {
+      flag = 0;
+      if (size(CA)!=0)
+	{
+	  for (k=1; k<=size(CA); k++)
+	    {
+	      if (i==CA[k])
+		{
+		  flag = 1;
+		  break;
+		}
+	    }
+	}
+      if (!flag)
+	{
+	  for (j=1; j<=size(b); j++)
+	    {
+	      if (m[i,j] != 0)
+		{
+		  break;
+		}
+	    }
+	  if (j>size(b))
+	    {
+	      A = insert(A,i,size(A)); 
+	    }
+	}
+    }
+  return(A);
+}
+
+proc isSubset (intvec a, intvec b)
+{
+  int i,j;
+  if (size(a) > size(b))
+    {
+      return(0);
+    }
+  else
+    {
+      for (i=1; i<=size(a); i++)
+	{
+	  for (j=1; j<=size(b); j++)
+	    {
+	      if (a[i] == b[j])
+		{
+		  break;
+		}
+	    }
+	  if (j>size(b))
+	    {
+	      return(0);
+	    }
+	}
+    }
+  return(1);
+}
+
+proc set_minus (intvec a, intvec b)
+{
+  int i,j,k;
+  intvec c;
+  k=1;
+  for (i=1; i<=size(a); i++)
+    {
+      for (j=1; j<=size(b);j++)
+	{
+	  if (a[i]==b[j])
+	    {
+	      break;
+	    }
+	}
+      if (j>size(b))
+	{
+	  c[k] = a[i];
+	  k = k+1;
+	}
+    }
+  return(c);
+}
+
+proc set_intersection (intvec a, intvec b)
+{
+  int i,j,k;
+  intvec c;
+  k=1;
+  for (i=1; i<=size(a); i++)
+    {
+      for (j=1; j<=size(b);j++)
+	{
+	  if (a[i]==b[j])
+	    {
+	      break;
+	    }
+	}
+      if (j<=size(b))
+	{
+	  c[k] = a[i];
+	  k = k+1;
+	}
+    }
+  return(c);
+}
+
+proc add_statement (list o, list statements)
+{
+  int i,j,n,m;
+  list r, s, t;
+  list L = statements;
+
+  //  s = set_minus(o[1],o[3]),set_minus(o[2],o[4]),set_minus(o[3],o[1]),set_minus(o[4],o[2]);
+
+  for (i=1; i<=size(L); i++)
+    { 
+      r = L[i];
+      //  t = set_minus(r[1],r[3]),set_minus(r[2],r[4]),set_minus(r[3],r[1]),set_minus(r[4],r[2]);
+
+      if ((isSubset(o[1],r[1]) and isSubset(o[2],r[2]) and o[3]==r[3] and o[4]==r[4]) or (isSubset(o[1],r[2]) and isSubset(o[2],r[1]) and o[3]==r[4] and o[4]==r[3]))
+	{
+	  return(L);
+	}
+
+      if ((isSubset(r[1],o[1]) and isSubset(r[2],o[2]) and o[3]==r[3] and o[4]==r[4]) or (isSubset(r[1],o[2]) and isSubset(r[2],o[1]) and r[3]==o[4] and r[4]==o[3]))
+	{
+	  L = delete(L,i);
+	  i--;
+	}
+
+      //      if ((isSubset(s[1],t[1]) and isSubset(s[2],t[2]) and s[3]==t[3] and s[4]==t[4]) or (isSubset(s[1],t[2]) and isSubset(s[2],t[1]) and s[3]==t[4] and s[4]==t[3]))
+      //{
+      //  return(L);
+      //}
+
+      //      if ((isSubset(t[1],s[1]) and isSubset(t[2],s[2]) and s[3]==t[3] and s[4]==t[4]) or (isSubset(t[1],s[2]) and isSubset(t[2],s[1]) and s[3]==t[4] and s[4]==t[3]))
+      //{
+      //  L = delete(L,i);
+      //  i--;
+      //}
+    }
+  
+  n = size(o[3])+size(o[4]);
+  if (o[3] == 0)
+    {
+      n = n-1;
+    }
+  if (o[4] == 0)
+    {
+      n = n-1;
+    }
+  
+  for (i=1; i<=size(L); i++)
+    {
+       r = L[i];
+       m = size(r[3])+size(r[4]);
+       if (r[3] == 0)
+	 {
+	   m = m-1;
+	 }
+       if (r[4] == 0)
+	 {
+	   m = m-1;
+	 }
+       if (m>n)
+	 {
+	   break;
+	 }
+    }
+  
+  L = insert(L,o,i-1);
+  return(L);
+}
+
+proc trek_ideal (int n, list constraints)
+{
+  int i,j,k,s;
+  intvec A,B,C,D;
+  ideal I;
+  matrix m;
+  matrix M[n][n];
+  k = 1;
+  for (i=1; i<=n; i++)
+    {
+      for (j=i; j<=n; j++)
+	{
+	  M[i,j] = var(k);
+	  M[j,i] = var(k);
+	  k++;
+	}
+    }
+ 
+  for (i=1; i<=size(constraints); i++)
+    {
+      A = constraints[i][1];
+      B = constraints[i][2];
+      C = 0;
+      if (constraints[i][3]!=0)
+	{
+	  C = constraints[i][3];
+	}
+      if (constraints[i][4]!=0)
+	{
+	  if (C==0)
+	    {
+	      C = constraints[i][4];
+	    }
+	  else
+	    {
+	      C = C,constraints[i][4];
+	    }
+	}
+
+      if (C!=0)
+	{
+	  D = set_minus(C,A);
+	  if (D!=0)
+	    {
+	      A = A,D;
+	    }
+	  D = set_minus(C,B);
+	  if (D!=0)
+	    {
+	      B = B,D;
+	    }
+	  s = size(C)+1;
+	}
+      else
+	{
+	  s = 1;
+	}
+
+      m = submat(M,A,B);
+      I = I + minor(m,s);
+    }
+  //I = slimgb(I);
+  I = groebner(I);
+  return(I);
+}
+
+proc is_determinantal (ideal K, ideal I)
+{
+  int i;
+  int flag = 1;
+  list out;
+  for (i=1; i<=size(K); i++)
+    {
+      if (reduce(K[i],I)!=0)
+	{
+	  out = insert(out,i,size(out));
+	  if (flag)
+	    {
+	      flag = 0;
+	    }
+	}
+    }
+  return(flag,out);
+}
+	      
+proc binary (int n, int N)
+{
+  int d = n / 2;
+  intvec b = 0:N;
+  int k = N;
+  b[k] = n%2;
+  
+  while (d>0)
+    {
+      k = k-1;
+      b[k] = d%2;
+      d = d / 2;
+    }
+  return(b);
+}
+
+proc kickit (int n, list #)
+{
+  int N = msize(n);
+  if (size(#)==0 or size(#)>9) { #[1] = 1; #[2] = 2^N-1; #[3] = 0; #[4] = 2^N-1; #[5] = 1; #[6] = 0; #[7] = 1; #[8] = 1; #[9] = 1; }
+  if (size(#)==1) { #[2] = 2^N-1; #[3] = 0; #[4] = 2^N-1; #[5] = 1; #[6] = 0; #[7] = 1; #[8] = 1; #[9] = 1;}
+  if (size(#)==2) { #[3] = 0; #[4] = 2^N-1; #[5] = 1; #[6] = 0; #[7] = 1; #[8] = 1; #[9] = 1;}
+  if (size(#)==3) { #[4] = 2^N-1; #[5] = 1; #[6] = 0; #[7] = 1; #[8] = 1; #[9] = 1;}
+  if (size(#)==4) { #[5] = 1; #[6] = 0; #[7] = 1; #[8] = 1; #[9] = 1;}
+  if (size(#)==5) { #[6] = 0; #[7] = 1; #[8] = 1; #[9] = 1;}
+  if (size(#)==6) { #[7] = 1; #[8] = 1; #[9] = 1;}
+  if (size(#)==7) { #[8] = 1; #[9] = 1;}
+  if (size(#)==8) { if (#[8]==0) {#[9] = 1;} else {#[9]=0;} }
+
+  int i,j;
+  intvec u,v;
+  string s,ifile,dfile,gfile,tfile;
+  int ustart, ustop = #[1], #[2];
+  int vstart, vstop = #[3], #[4];
+
+  for (i=ustart; i<=ustop; i++)
+    { 
+      u = binary(i, N);
+      "starting i ",i;"...";"";"intvec u = ",u;"";
+      for (j=vstart; j<=vstop; j++)
+	{
+	  v = binary(j,N);
+	  s = sdec2(u)+"_"+sdec2(v);
+	  ifile = s+"_Ideal.txt";
+	  gfile = s+"_Graph.tex";
+	  dfile = s+"_Data.txt";
+	  tfile = s+"_Time.txt";
+
+	  "...starting j ",j;"";"...intvec v = ",v;"";
+	  identify(u,v,dfile,gfile,ifile,tfile,#[5],#[6],#[7],#[8],#[9]);
+	  "...ending j ",j;"";
+	}
+      "ending i ",i,"...";"";
+    }
+}      
+
+proc kickit_iso (int n, list dags, list #)
+{
+  int N = msize(n);
+  if (size(#)==0 or size(#)>9) { #[1] = 1; #[2] = size(dags); #[3] = 0; #[4] = 2^N-1; #[5] = 1; #[6] = 0; #[7] = 1; #[8] = 1; #[9] = 1; }
+  if (size(#)==1) { #[2] = size(dags); #[3] = 0; #[4] = 2^N-1; #[5] = 1; #[6] = 0; #[7] = 1; #[8] = 1; #[9] = 1;}
+  if (size(#)==2) { #[3] = 0; #[4] = 2^N-1; #[5] = 1; #[6] = 0; #[7] = 1; #[8] = 1; #[9] = 1;}
+  if (size(#)==3) { #[4] = 2^N-1; #[5] = 1; #[6] = 0; #[7] = 1; #[8] = 1; #[9] = 1;}
+  if (size(#)==4) { #[5] = 1; #[6] = 0; #[7] = 1; #[8] = 1; #[9] = 1;}
+  if (size(#)==5) { #[6] = 0; #[7] = 1; #[8] = 1; #[9] = 1;}
+  if (size(#)==6) { #[7] = 1; #[8] = 1; #[9] = 1;}
+  if (size(#)==7) { #[8] = 1; #[9] = 1;}
+  if (size(#)==8) { if (#[8]==0) {#[9] = 1;} else {#[9]=0;} }
+
+  int i,j;
+  intvec u,v;
+  string s,ifile,dfile,gfile,tfile;
+
+  int ustart, ustop = #[1], #[2];
+  int vstart, vstop = #[3], #[4];
+
+  for (i=ustart; i<=ustop; i++)
+    { 
+      u = dags[i];
+      "starting i ",i;"...";"";"intvec u = ",u;"";
+      for (j=vstart; j<=vstop; j++)
+	{
+	  v = binary(j,N);
+	  s = sdec2(u)+"_"+sdec2(v);
+	  ifile = s+"_Ideal.txt";
+	  gfile = s+"_Graph.tex";
+	  dfile = s+"_Data.txt";
+	  tfile = s+"_Time.txt";
+
+	   "...starting j ",j;"";"...intvec v = ",v;"";
+	   identify(u,v,dfile,gfile,ifile,tfile,#[5],#[6],#[7],#[8],#[9]); 
+	  "...ending j ",j;"";
+	}
+      "ending i ",i,"...";"";
+    }      
+}
+
+proc single_door (int I, int J, intvec u, intvec v)
+{
+  int i,j,k,e,flag;
+  int n = Msize(u);
+  intmat m = gbnet(u,v);
+  intmat t[n][n];
+  e = nonzerosize(v);
+  intmat M[n+e][n+e];
+  intmat Mij;
+  list reverse,A,B,C,X,output,s;
+  intvec a,b,c;
+
+  for (i=n; i>=1; i--)
+    {
+      t[n-i+1,i]=1;
+    }
+  m = t*m*t;
+  for (i=1; i<=n; i++)
+    {
+      reverse[i] = n-i+1;
+    }
+  for (i=2; i<=n; i++)
+    {
+      for (j=1; j<i; j++)
+	{
+	  M[i,j] = m[i,j];
+	}
+    }
+  k = n+1;
+  for (i=1; i<n; i++)
+    {
+      for (j=i+1; j<=n; j++)
+	{
+	  if (m[i,j]==1)
+	    {
+	      M[k,i] = 1;
+	      M[k,j] = 1;
+	      k++;
+	    }
+	}
+    }
+  Mij = M;
+  Mij[reverse[I],reverse[J]]=0;
+  A = reverse[I];
+  X = nondec(reverse[J],M);
+  for (k=1; k<=size(X); k++)
+    {
+      if (X[k]==reverse[I] or X[k]>n) 
+	{
+	  X = delete(X,k);
+	  k = k-1;
+	}
+    }
+  for (i=0; i<=2^size(X)-1; i++)
+    {
+      C = subset(i,X);
+      B = Bayes_ball(A,C,Mij);
+      for (j=1; j<=size(B); j++)
+	{
+	  if (reverse[J] == B[j])
+	    {
+	      flag = 1;
+	      a = reverse[A[1]];
+	      b = reverse[B[1]];
+	      for (k=2; k<=size(B); k++)
+		{
+		  if (B[k] <= n)
+		    {
+		      b = reverse[B[k]],b;
+		    }
+		} 
+	      if (size(C)!=0)
+		{
+		  c = reverse[C[1]];
+		  for (k=2; k<=size(C); k++)
+		    {
+		      if (C[k] <= n)
+			{
+			  c = reverse[C[k]],c;
+			}
+		    } 
+		  s = a,b,c;
+		}
+	      else
+		{
+		  s = a,b,list();
+		}
+	      output = insert(output,s,size(output));
+	      break;
+	    }
+	}
+    }
+  return(flag,output);
+}
+
+proc instrumental_variable (int I, int J, intvec u, intvec v)
+{
+  int i,j,k,e,flag,K;
+  int n = Msize(u);
+  intmat m = gbnet(u,v);
+  intmat t[n][n];
+  e = nonzerosize(v);
+  intmat M[n+e][n+e];
+  intmat Mij;
+  list reverse,A,B1,B2,C,X,output,s;
+  intvec a,c;
+
+  for (i=n; i>=1; i--)
+    {
+      t[n-i+1,i]=1;
+    }
+  m = t*m*t;
+  for (i=1; i<=n; i++)
+    {
+      reverse[i] = n-i+1;
+    }
+  for (i=2; i<=n; i++)
+    {
+      for (j=1; j<i; j++)
+	{
+	  M[i,j] = m[i,j];
+	}
+    }
+  k = n+1;
+  for (i=1; i<n; i++)
+    {
+      for (j=i+1; j<=n; j++)
+	{
+	  if (m[i,j]==1)
+	    {
+	      M[k,i] = 1;
+	      M[k,j] = 1;
+	      k++;
+	    }
+	}
+    }
+  Mij = M;
+  Mij[reverse[I],reverse[J]]=0;
+  for (K=1; K<=n; K++)
+    {
+      if (K!=I and K!=J)
+	{
+	  A = reverse[K];
+	  X = nondec(reverse[J],M);
+	  for (k=1; k<=size(X); k++)
+	    {
+	      if (X[k]==reverse[K] or X[k]==reverse[I] or X[k]>n)
+		{
+		  X = delete(X,k);
+		  k = k-1;
+		}
+	    }
+	  for (i=0; i<=2^size(X)-1; i++)
+	    {
+	      C = subset(i,X);
+	      B1 = Bayes_ball(A,C,Mij);
+
+	      for (j=1; j<=size(B1); j++)
+		{
+		  if (reverse[J] == B1[j])
+		    {
+		      B2 = Bayes_ball(A,C,M);
+		      for (k=1; k<=size(B2); k++)
+			{
+			  if (reverse[I] == B2[k])
+			    {
+			      break;
+			    }
+			}
+		      if (k > size(B2))
+			{
+			  flag = 1;
+			  a = K;
+			  if (size(C)!=0)
+			    {
+			      c = reverse[C[1]];
+			      for (k=2; k<=size(C); k++)
+				{
+				  if (C[k] <= n)
+				    {
+				      c = reverse[C[k]],c;
+				    }
+				} 
+			      s = a,c;
+			    }
+			  else
+			    {
+			      s = a,list();
+			    }
+			  output = insert(output,s,size(output));
+			  break;
+			}
+		    }
+		}
+	    }
+	}
+    }
+  return(flag,output);
+}
+
+proc back_door (int I, int J, intvec u, intvec v)
+{
+  int i,j,k,e,flag;
+  int n = Msize(u);
+  intmat m = gbnet(u,v);
+  intmat t[n][n];
+  e = nonzerosize(v);
+  intmat M[n+e][n+e];
+  intmat Mij;
+  list reverse,A,B,C,X,output,s;
+  intvec a,b,c;
+
+  for (i=n; i>=1; i--)
+    {
+      t[n-i+1,i]=1;
+    }
+  m = t*m*t;
+  for (i=1; i<=n; i++)
+    {
+      reverse[i] = n-i+1;
+    }
+  for (i=2; i<=n; i++)
+    {
+      for (j=1; j<i; j++)
+	{
+	  M[i,j] = m[i,j];
+	}
+    }
+  k = n+1;
+  for (i=1; i<n; i++)
+    {
+      for (j=i+1; j<=n; j++)
+	{
+	  if (m[i,j]==1)
+	    {
+	      M[k,i] = 1;
+	      M[k,j] = 1;
+	      k++;
+	    }
+	}
+    }
+  Mij = M;
+  for (j=1; j<=n; j++)
+    {
+      Mij[reverse[I],j]=0;
+    }
+  A = reverse[I];
+  X = nondec(reverse[I],M);
+  for (k=1; k<=size(X); k++)
+    {
+      if (X[k]==reverse[J] or X[k]>n) 
+	{
+	  X = delete(X,k);
+	  k = k-1;
+	}
+    }
+  for (i=0; i<=2^size(X)-1; i++)
+    {
+      C = subset(i,X);
+      B = Bayes_ball(A,C,Mij);
+      for (j=1; j<=size(B); j++)
+	{
+	  if (reverse[J] == B[j])
+	    {
+	      flag = 1;
+	      a = reverse[A[1]];
+	      b = reverse[B[1]];
+	      for (k=2; k<=size(B); k++)
+		{
+		  if (B[k] <= n)
+		    {
+		      b = reverse[B[k]],b;
+		    }
+		} 
+	      if (size(C)!=0)
+		{
+		  c = reverse[C[1]];
+		  for (k=2; k<=size(C); k++)
+		    {
+		      if (C[k] <= n)
+			{
+			  c = reverse[C[k]],c;
+			}
+		    } 
+		  s = a,b,c;
+		}
+	      else
+		{
+		  s = a,b,list();
+		}
+	      output = insert(output,s,size(output));
+	      break;
+	    }
+	}
+    }
+  return(flag,output);
+}

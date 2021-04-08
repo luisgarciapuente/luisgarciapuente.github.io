@@ -1,0 +1,1395 @@
+// Luis David Garcia-Puente, last modified: 07.25.09
+// Changsung Kang
+///////////////////////////////////////////////////////////////////////////////
+version="$Id: Markov.lib,v 1.0.0.0 2009/07/25 18:09:30 levandov Exp $";
+category="Algebraic Statistics";
+info="
+LIBRARY:  Markov.lib     Markov Relations for Bayesian Networks
+
+PROCEDURES:
+ info(ideal)                                  displays codim, degree, #mingens.
+ bnet(int,intvec)                             creates a matrix. Bayesian net in topological order. 
+ nondec(int,intmat)                           nondescendents of a vertex
+ pairMarkov(intmat)                           pairwise Markov property
+ parent(int,intmat)                           parents of a vertex
+ nondecminusparents(int,intmat)               nondescendents(excluding the parents) of a vertex
+ localMarkov(intmat)                          local Markov property
+ subset(int,list)                             subset of a list
+ children(int,intmat)                         children of a vertex
+ Bayes_ball(list,list,intmat)                 computes a maximal set of vertices d-separated from a set given a conditioning set
+ globalMarkov(intmat)                         global Markov property
+ equivStatements(list,list)                   tests whether two conditional independence statements are equivalent
+ next(intvec,int,intvec)                      index of the next variable in the ring
+ sdec(intvec)                                 decimal representation of a list
+ probring(intvec,list)                        creates a probability distribution ring
+ index(list,intvec)                           index of the corresponding indeterminate
+ cartesian(list)                              cartesian product of elements in a list
+ Pairs(list)                                  set of all pairs of elements in a list
+ levels(int)                                  levels of a random variable
+ Prob(list,intvec)                            marginalization over the subset of the random variables specified \"IND\"  
+ Quad(list,list,list,list,list,list,intvec)   quadric associated to a fixed event
+ StatementQuadrics(list,list,list,intvec)     all quadrics associated to a conditional independence statement
+ MarkovIdeal(list,intvec)                     computes the Markov ideal for a list of conditional independence statements
+ torideal(ideal,intvec)                       computes the distinguished component of an ideal
+ map_observable(def,intvec,int)               creates a ring map from a ring associated to an observable probability distribution to basering
+";
+
+LIB "general.lib";
+LIB "elim.lib";
+LIB "primdec.lib";
+LIB "standard.lib";
+LIB "presolve.lib";
+///////////////////////////////////////////////////////////////////////////////
+
+// The comments are still a little lousy but I'll work on it later.
+
+// General function to return information about the ideal
+
+proc info (ideal I)
+"USAGE:   info(I); I ideal
+RETURN:   list of integers a[1],a[2] and a[3] with:
+- a[1] the codimension of I
+- a[2] the degree of I
+- a[3] the number of minimal generators of I
+EXAMPLE:  example info; shows an example"
+{
+  int c = nvars(basering) - dim(I);
+  int d = degree(I);
+  int s = size(minbase(I));
+  list l = c,d,s;
+  return(l);
+}
+example
+{
+  "EXAMPLE:"; echo = 2;
+  intvec d = 2,2,2,2;
+  int n = size(d);
+  def pdR = probring(d);
+  setring pdR;
+  intvec v = 1,1,0,0,1,1; 
+  intmat m = bnet(n,v); 
+  list l = localMarkov(m);
+  ideal I = MarkovIdeal(l,d); 
+  info(I);
+}
+
+/* Definition of the matrix corresponding to the Bayesian Network.
+   This procedure assumes that the DAG is in topological order
+   n > n-1 > ... > 1 */
+
+proc bnet (int n, intvec u)
+"USAGE:   bnet(n,u); n int, u intvec
+RETURN:   an n*n matrix whose lower triangle is given by u
+m[i,j] implies the existence of an edge (i,j)
+EXAMPLE:  example bnet; shows an example"
+{
+  int i,j,k;
+  intmat m[n][n];
+  for (i=2; i<=n; i++)
+    {
+      for (j=1; j<i; j++)
+	{
+	  k++;
+	  m[i,j] = u[k];
+	}
+    }
+  return(m);
+}
+example
+{
+  "EXAMPLE:"; echo = 2;
+  intvec v = 1,1,0,0,1,1; 
+  intmat m = bnet(4,v); 
+  m;
+}
+
+//////////////////////////////////////////////////////////////////
+/* Definition of the Pairwise Markov Relations */
+//////////////////////////////////////////////////////////////////
+
+proc nondec (int v, intmat m)
+"USAGE:   nondec(v,m); n int, m intmat
+RETURN:   list: the nondescendents of the vertex v
+EXAMPLE:  example nondec; shows an example"
+{
+  int n = ncols(m);
+  list l,s, visited;
+  int i,j,k;
+  s = v;
+  for (i=1; i<=n; i++)
+    {
+      visited[i] = 0;
+    }
+  while (size(s) != 0)
+    {
+      k = s[1];
+      s = delete(s,1);
+      visited[k] = 1;
+      for (j=1; j<=n; j++)
+	{
+	  if (m[k,j] == 1)
+	    {
+	      if (visited[j] == 0)
+		{
+		  s = insert(s,j);
+		}
+	    }
+	}
+    }
+  for (i=1; i<=n; i++)
+    {
+      if (visited[i] == 0)
+	{
+	  l = insert(l,i,size(l));
+	}
+    }
+  return(l);
+}
+example
+{
+  "EXAMPLE:"; echo = 2;
+  intvec v = 1,1,0,0,1,1; 
+  intmat m = bnet(4,v);
+  nondec(1,m);
+}
+
+proc pairMarkov (intmat m)
+"USAGE:   pairMarkov(m); m intmat
+RETURN:   l list: the pairwise Markov property
+l[i] corresponds to the ith conditional independence statement, l[i][1] is independent of l[i][2] given l[i][3]
+EXAMPLE:  example pairMarkov; shows an example"
+{
+  int n = ncols(m);
+  list nd, l, s, e, e2;
+  int i, j, k, c, check;
+  for (i=1; i<=n; i++)
+    {
+      nd = nondec(i,m);
+      if (size(nd) != 0)
+	{
+	  for (j=1; j<=size(nd); j++)
+	    {
+	      if (m[nd[j],i] == 0)
+		{
+		  s = list();
+		  s = insert(s,list(i));
+		  s = insert(s, list(nd[j]), size(s));
+		  s = insert(s, delete(nd,j), size(s));
+		  if (nd[j] > i)
+		    {
+		      l = insert(l,s,size(l));
+		    }
+		  else
+		    {
+		      c = nd[j];
+		      e = nondec(c,m);
+		      if (size(e) == 0)
+			{
+			  l = insert(l,s,size(l));
+			}
+		      else
+			{
+			  for (k=1; k<=size(e); k++)
+			    {
+			      if (e[k] == i)
+				{
+				  check = 1;
+				  break;
+				}
+			    }
+			  if (check == 0)
+			    {
+			      l = insert(l,s,size(l));
+			    }
+			  else
+			    {
+			      e = delete(e,k);
+			      e2 = delete(nd,j);
+			      if (size(e) != size(e2))
+				{
+				  l = insert(l,s,size(l));
+				}
+			      else
+				{
+				  if (size(e) != 0)
+				    {
+				      check = 0;
+				      for (k=1; k<=size(e); k++)
+					{
+					  if (e[k] != e2[k])
+					    {
+					      check = 1;
+					      break;
+					    }
+					}
+				      if (check == 1)
+					{
+					  l = insert(l,s,size(l));
+					}
+				    }
+				}
+			    }
+			}
+		    }
+		}
+	    }
+	}
+    }
+  return(l);
+}
+example
+{
+  "EXAMPLE:"; echo = 2;
+  intvec v = 1,1,0,0,1,1; 
+  intmat m = bnet(4,v);
+  pairMarkov(m);
+}
+
+//////////////////////////////////////////////////////////////////
+/* Definition of the Local Markov Relations */
+//////////////////////////////////////////////////////////////////
+
+proc parent (int v, intmat m)
+"USAGE:   parent(v,m); n int, m intmat
+RETURN:   list: the parents of the vertex v
+EXAMPLE:  example parent; shows an example"
+{
+  int n = ncols(m);
+  list l;
+  int i;
+  for (i=1; i<=n; i++)
+    {
+      if (m[i,v] == 1)
+	{
+	  l = insert(l,i,size(l));
+	}
+    }
+  return(l);
+}
+example
+{
+  "EXAMPLE:"; echo = 2;
+  intvec v = 1,1,0,0,1,1; 
+  intmat m = bnet(4,v);
+  parent(1,m);
+}
+
+proc nondecminusparents (int v, intmat m)
+"USAGE:   nondec(v,m); n int, m intmat
+RETURN:   list: the nondescendents(excluding the parents) of the vertex v
+EXAMPLE:  example nondecminusparents; shows an example"
+{
+  int n = ncols(m);
+  list l,s, visited;
+  int i,j,k;
+  s = v;
+  for (i=1; i<=n; i++)
+    {
+      visited[i] = 0;
+    }
+  while (size(s) != 0)
+    {
+      k = s[1];
+      s = delete(s,1);
+      visited[k] = 1;
+      for (j=1; j<=n; j++)
+	{
+	  if (m[k,j] == 1)
+	    {
+	      if (visited[j] == 0)
+		{
+		  s = insert(s,j);
+		}
+	    }
+	}
+    }
+  for (i=1; i<=n; i++)
+    {
+      if (visited[i] == 0 and m[i,v] == 0)
+	{
+	  l = insert(l,i,size(l));
+	}
+    }
+  return(l);
+}
+example
+{
+  "EXAMPLE:"; echo = 2;
+  intvec v = 1,1,0,0,1,1; 
+  intmat m = bnet(4,v);
+  nondecminusparents(1,m);
+}
+
+proc localMarkov (intmat m)
+"USAGE:   localMarkov(m); m intmat
+RETURN:   l list: the local Markov property
+l[i] corresponds to the ith conditional independence statement, l[i][1] is independent of l[i][2] given l[i][3]
+EXAMPLE:  example localMarkov; shows an example"
+{
+  int n = ncols(m);
+  list pa, s, l, nd, e;
+  int i,c,check;
+  for (i=1; i<=n; i++)
+    {
+      s = list();
+      s = insert(s,list(i));
+      nd = nondecminusparents(i,m);
+      if (size(nd) != 0)
+	{
+	  pa = parent(i,m);
+	  s = insert(s,nd,size(s));
+	  s = insert(s,pa,size(s));
+          if (size(nd) > 1)
+	    {
+	      l = insert(l,s,size(l));
+	    }
+	  else
+	    {
+	      c = nd[1];
+	      if (c > i)
+		{
+		  l = insert(l,s,size(l));
+		}
+	      else
+		{ 
+                  e = parent(c,m);
+		  if (size(e) != size(pa))
+		    {
+		      l = insert(l,s,size(l));
+		    }
+		  else
+		    {
+		      if (size(e) != 0)
+			{
+			  check = 1;
+			  while (check < size(e) and e[check] == pa[check])
+			    {
+			      check++;
+			    }
+			  if (check != size(e))
+			    {
+			      l = insert(l,s,size(l));
+			    }
+			}
+		      e = nondecminusparents(c,m);
+		      if (size(e) != 1)
+			{
+			  l = insert(l,s,size(l));
+			}
+		      else
+			{
+			  if (e[1] != i)
+			    {
+			      l = insert(l,s,size(l));
+			    }
+			}
+		    }
+		}
+	    }
+	}
+    }
+  return(l);
+}
+example
+{
+  "EXAMPLE:"; echo = 2;
+  intvec v = 1,1,0,0,1,1; 
+  intmat m = bnet(4,v);
+  localMarkov(m);
+}
+
+//////////////////////////////////////////////////////////////////
+/* Construction of the Global Markov Relations */
+//////////////////////////////////////////////////////////////////
+
+proc subset (int k, list X)
+"USAGE:   subset(k,X); k int, X list
+RETURN:   list: a subset of X
+@* If @math{b_n\cdots b_1} is the binary representation of the integer k, then subset(k,X) returns the set {@math{X[i]~|~b_i=1}}
+EXAMPLE:  example subset; shows an example"
+{
+  if (size(X) == 0)
+    {
+      return(list());
+    }
+  int n = size(X);
+  intvec bin;
+  int q,i;
+  for (i=1; i<=n; i++)
+    {
+      bin[i] = 0;
+    }
+  q = k;
+  i = 1;
+  while (q != 0)
+    {
+      bin[i] = q%2;
+      q = q / 2;
+      i++;
+    }
+  list res;
+  for (i=1; i<=n; i++)
+    {
+      if (bin[i] == 1)
+	{
+	  res = insert(res, X[i] ,size(res));
+	}
+    }
+  return(res);
+}
+example
+{
+  "EXAMPLE:"; echo = 2;
+  list l = 1,2,3;
+  for(int i=1;i<=7;i++)
+    {
+      subset(i,l);
+    }
+}
+
+proc children (int v, intmat m)
+"USAGE:   children(v,m); n int, m intmat
+RETURN:   list: the children of the vertex v
+EXAMPLE:  example children; shows an example"
+{
+  int n = ncols(m);
+  list l;
+  int i;
+  for (i=1; i<=n; i++)
+    {
+      if (m[v,i] == 1)
+	{
+	  l = insert(l,i,size(l));
+	}
+    }
+  return(l);
+}
+example
+{
+  "EXAMPLE:"; echo = 2;
+  intvec v = 1,1,0,0,1,1; 
+  intmat m = bnet(4,v);
+  children(4,m);
+}
+
+proc Bayes_ball (list A, list C, intmat m)
+"USAGE:   Bayes_ball(A,C,m); A list, C list, m intmat
+RETURN:   list: a maximal set of vertices B such that A and B are d-separated by C
+EXAMPLE:  example Bayes_ball; shows an example"
+{
+  int n = ncols(m);
+  int i,v;
+  list B, pa,ch,vqueue;
+  intvec visited, blocked, up, down, top, bottom;
+  for (i=1; i<=n; i++)
+    {
+      visited[i] = 0;
+      blocked[i] = 0;
+      up[i] = 0;
+      down[i] = 0;
+      top[i] = 0;
+      bottom[i] = 0;
+    }
+  for (i=1; i<=size(C); i++)
+    {
+      blocked[C[i]] = 1;
+    }
+  for (i=1; i<=size(A); i++)
+    {
+      vqueue = insert(vqueue, A[i]);
+      up[A[i]] = 1;
+    }
+  while (size(vqueue) != 0)
+    {
+      v = vqueue[size(vqueue)];
+      vqueue = delete(vqueue,size(vqueue));
+      visited[v] = 1;
+      if (!blocked[v] and up[v])
+	{
+	  if (!top[v])
+	    {
+	      top[v] = 1;
+	      pa = parent(v,m);
+	      for (i=1; i<=size(pa); i++)
+		{
+		  vqueue = insert(vqueue, pa[i]);
+		  up[pa[i]] = 1;
+		}
+	    }
+	  if (!bottom[v])
+	    {
+	      bottom[v] = 1;
+	      ch = children(v,m);
+	      for (i=1; i<=size(ch); i++)
+		{
+		  vqueue = insert(vqueue, ch[i]);
+		  down[ch[i]] = 1;
+		}
+	    }
+	}
+      if (down[v])
+	{
+	  if (blocked[v] and !top[v])
+	    {
+	      top[v] = 1;
+	      pa = parent(v,m);
+	      for (i=1; i<=size(pa); i++)
+		{
+		  vqueue = insert(vqueue, pa[i]);
+		  up[pa[i]] = 1;
+		}
+	    }
+	  if (!blocked[v] and !bottom[v])
+	    {
+	      bottom[v] = 1;
+	       ch = children(v,m);
+	      for (i=1; i<=size(ch); i++)
+		{
+		  vqueue = insert(vqueue, ch[i]);
+		  down[ch[i]] = 1;
+		}
+	    }
+	}
+    }
+  for (i=1; i<=n; i++)
+    {
+      if(!bottom[i] and !blocked[i])
+	{
+	  B = insert(B,i,size(B));
+	}
+    }
+  return(B);
+}
+example
+{
+  "EXAMPLE:"; echo = 2;
+  intvec v = 1,0,1,0,1,0;
+  intmat m = bnet(4,v);
+  list A = 1;
+  list C = 2;
+  Bayes_ball(A,C,m);
+}
+
+proc globalMarkov (intmat m)
+"USAGE:   globalMarkov(m); m intmat
+RETURN:   l list: the global Markov property
+l[i] corresponds to the ith conditional independence statement, l[i][1] is independent of l[i][2] given l[i][3]
+EXAMPLE:  example localMarkov; shows an example"
+{
+  int n = ncols(m);
+  int i,j,k,d,flag;
+  list X,Y,A,B,C,l,s;
+  for (i=1; i<=n; i++)
+    {
+      X[i] = i;
+    }
+  for (i=1; i<2^n-1; i++)
+    {
+      A = subset(i,X);
+      Y = subset(2^n-i-1, X);
+      d = size(Y);
+      for (j=0; j<2^d-1; j++)
+	{
+	  C = subset(j,Y);
+	  B = Bayes_ball(A,C,m);
+	  if (size(B)!=0)
+	    {
+	      flag = 0;
+	      s = list();
+	      s = insert(s,A);
+	      s = insert(s,B,size(s));
+	      s = insert(s,C,size(s));
+	      for (k=1; k<=size(l); k++)
+		{
+		  if (equivStatements(s,l[k]))
+		    {
+		      flag = 1;
+		      break;
+		    }
+		}
+	      if (!flag)
+		{
+		  l = insert(l,s,size(l));
+		}
+	    }
+	}
+    }
+  return(l);
+}
+example
+{
+  "EXAMPLE:"; echo = 2;
+  intvec v = 1,1,0,0,1,1; 
+  intmat m = bnet(4,v);
+  globalMarkov(m);
+}
+
+proc equivStatements(list s, list t)
+"USAGE:   equivStatements(s,t); s list, t list
+RETURN:   1 if s[1]=t[2], s[2]=t[1] and s[3]=t[3]
+0 otherwise
+EXAMPLE:  example equivStatements; shows an example"
+{
+  int i;
+  if (size(s[1])!=size(t[2]) or size(s[2])!=size(t[1]) or size(s[3])!=size(t[3]))
+    {
+      return(0);
+    }
+  for (i=1; i<=size(s[1]); i++)
+    {
+      if (s[1][i] != t[2][i])
+	{
+	  return(0);
+	}
+    }
+  for (i=1; i<=size(s[2]); i++)
+    {
+      if (s[2][i] != t[1][i])
+	{
+	  return(0);
+	}
+    }
+  for (i=1; i<=size(s[3]); i++)
+    {
+      if (s[3][i] != t[3][i])
+	{
+	  return(0);
+	}
+    }  
+  return(1);
+}
+example
+{
+  "EXAMPLE:"; echo = 2;
+  list s = 1,list(2,3),4;
+  list t = list(2,3),1,4;
+  equivStatements(s,t);
+}
+
+//////////////////////////////////////////////////////////////////
+/* Construction of the probability distribution ring */
+//////////////////////////////////////////////////////////////////
+
+/* This procedure computes the index of the next variable in the ring */
+
+proc next (intvec u, int j, intvec d)
+"USAGE:   next(u,j,d); u intvec, j int, d intvec
+RETURN:   intvec: the index of the next variable in the ring
+EXAMPLE:  example next; shows an example"
+{
+  intvec v = u;
+  if (j > 1)
+    {
+      v[j] = (v[j]+1)%(d[j]+1);
+      if (v[j] == 0)
+	{
+          v[j] = 1;
+	  v = next (v, j-1, d);
+	}
+    }
+  else
+    {
+      int check = (v[j]+1)%(d[j]+1);
+      if (check != 0)
+	{
+	  v[j] = check;
+	}
+    }
+  return(v);
+}
+example
+{
+  "EXAMPLE:"; echo = 2;
+  intvec d = 2,2,2;
+  def pdR = probring(d);
+  setring pdR;
+  intvec idx;
+  for (int i=1; i<=size(d); i++)
+    {
+      idx[i] = 1;
+    }
+  idx = next(idx,size(d),d);
+  idx;
+  idx = next(idx,size(d),d);
+  idx;
+}
+
+proc sdec (intvec id)
+"USAGE:   sdec(id); id intvec
+RETURN:   string: id[1]*10^(n-1)+id[2]*10^(n-2)+...+id[n]
+EXAMPLE:  example sdec; shows an example"
+{
+  int n = size(id);
+  int dec;
+  for (int i=n; i>=1; i--)
+    {
+      dec = dec + id[i]*(10)^(n-i);
+    }
+  return(string(dec));
+}
+example
+{
+  "EXAMPLE:"; echo = 2;
+  intvec id = 1,4,10;
+  sdec(id);
+}
+
+proc sdec2 (intvec id)
+{
+  int n = size(id);
+  string s;
+  for (int i=1; i<=n; i++)
+    {
+      s = s+string(id[i]);
+    }
+  return(s);
+}
+
+/* This procedure has as its input the list of d_i's */
+
+proc probring (intvec d, list#)
+"USAGE:   probring(d[,f,v,o]); d intvec, f string, v string, o string
+RETURN:   ring: ring R with coefficient field f, ring variables v1...1,...,vd[1]...d[n] and term ordering o
+@*The default values for f, v and o are \"0\", \"p\" and \"dp\" respectively
+EXAMPLE:  example probring; shows an example"
+{
+  if (size(#)==0 or size(#)>3) { #[1] = "0"; #[2] = "p"; #[3] = "dp";}
+  if (size(#)==1) { #[2] = "p"; #[3] = "dp";}
+  if (size(#)==2) { #[3] = "dp";}
+  int i;
+  intvec idx;
+  for (i=1; i<=size(d); i++)
+    {
+      idx[i] = 1;
+    }
+  string ringconstructor = "ring  nameofmyprettyring = " + #[1] + ",(" + #[2] + sdec(idx);
+  for (i=2; i<=product(d); i++)
+    {
+      ringconstructor = ringconstructor + ",";
+      idx = next(idx,size(d),d);
+      ringconstructor = ringconstructor + #[2] + sdec(idx);
+    }
+  ringconstructor = ringconstructor + ")," + #[3] + ";";
+  execute(ringconstructor);
+  return(basering);
+}
+example
+{
+  "EXAMPLE:"; echo = 2;
+  intvec d = 2,2,3;
+  probring(d);
+}
+
+/* This procedure return the index of the corresponding indeterminate */
+
+proc index (list linput, intvec d)
+"USAGE:   index(linput,d); linput list, d intvec
+RETURN:   int: the index of the corresponding indeterminate
+EXAMPLE:  example index; shows an example"
+{
+  int i;
+  int base = 1;
+  list shift = linput;
+  for (i=1; i<=size(shift); i++)
+    {
+      shift[i] = shift[i]-1;
+    }
+  int n = size(shift);
+  int idx = shift[n];
+  for (i=n-1; i>=1; i--)
+    {
+      base = base*d[i+1];
+      idx = idx + shift[i]*base;
+    }
+  idx = idx+1;
+  return(idx);
+}
+example
+{
+  "EXAMPLE:"; echo = 2;
+  intvec d = 2,2,2;
+  def pdR = probring(d);
+  setring pdR;
+  list l = 1,2,1;
+  index(l,d);
+  var(index(l,d));
+}
+ 
+
+//////////////////////////////////////////////////////////////////
+/* Computation of the ideal I_M for all the models defined above */
+//////////////////////////////////////////////////////////////////
+
+/* This procedure computes the cartesian product of a list of lists */
+
+proc cartesian (list linput)
+"USAGE:   cartesian(linput); linput list
+RETURN:   list: the cartesian product of a list of lists
+EXAMPLE:  example index; shows an example"
+{
+  int i,j,k;
+  if (size(linput) == 1) 
+    {
+      list l = linput[1];
+      for (i=1; i<=size(l); i++)
+	{l[i] = list(l[i]);}
+      return(l);
+    }
+  list head = linput[1];
+  list tail = cartesian(delete(linput,1));
+  list final, each;
+  for (i=1; i<=size(head); i++)
+    {
+    for (j=1; j<=size(tail); j++)
+      {
+	each = insert(tail[j], head[i]);
+	final = insert(final, each, size(final));
+      }
+    }
+  return(final);
+}
+example
+{
+  "EXAMPLE:"; echo = 2;
+  list l = list(1,2),list(1,2),list(1);
+  cartesian(l);
+}
+
+/* This procedure computes the set of all pairs of a given list */
+
+proc Pairs (list L)
+"USAGE:   Pairs(L); L list
+RETURN:   list: the set of all pairs of L
+EXAMPLE:  example Pairs; shows an example"
+{
+  int i,j;
+  list result;
+  for (i=1; i<=size(L)-1; i++)
+    {
+      for (j=i+1; j<=size(L); j++)
+	{
+	  result = insert(result, list(L[i],L[j]), size(result));
+	}
+    }
+  return(result);
+}
+example
+{
+  "EXAMPLE:"; echo = 2;
+  Pairs(list(1,2,3));
+}
+
+/* This little procedure computes the levels of the random variable Xi */
+
+proc levels (int di)
+"USAGE:   levels(di); di int
+RETURN:   list: the levels of the random variable Xi
+EXAMPLE:  example levels; shows an example"
+{
+  list l;
+  for (int i=1; i<=di; i++)
+    {
+      l[i] = i;
+    }
+  return(l);
+}
+example
+{
+  "EXAMPLE:"; echo = 2;
+  levels(3);
+}  
+
+/* This procedure computes the linear form Prob(A) 
+   for an instantiation of a subset A of the random variables */
+
+proc Prob (list linput, intvec d)
+"USAGE:   Prob(linput,d); linput list, d intvec
+RETURN:   poly: the marginalization over the subset of the random variables specified \"IND\"
+EXAMPLE:  example Prob; shows an example"
+{
+  int i;
+  list l=linput;
+  for (i=1; i<=size(linput); i++)
+    {
+      if (typeof(l[i]) == "string")
+	{
+	  l[i] = levels(d[i]);
+	}
+      else
+	{
+	  l[i] = list(l[i]);
+	}
+    }
+  l = cartesian(l);
+  poly pr;
+  for (i=1; i<=size(l); i++)
+    {
+      pr = pr + var(index(l[i],d));
+    }
+  return(pr);
+}
+example
+{
+  "EXAMPLE:"; echo = 2;
+  intvec d = 2,2,2;
+  def pdR = probring(d);
+  setring pdR;
+  list l = 1,"IND","IND";
+  Prob(l,d);
+}
+
+/* This procedure computes the quadric associated to the fixed event
+   P(A=a,B=b,C=c) */
+
+proc Quad (list A, list a, list B, list b, list C, list c, intvec d)
+"USAGE:   Quad (A,a,B,b,C,c,d); A list, a list, B list, b list, C list, c list, d intvec
+RETURN:   poly: the quadric associated to the probability P(A=a[1],B=b[1],C=c)*
+P(A=a[2],B=b[2],C=c)-P(A=a[2],B=b[1],C=c)*P(A=a[1],B=b[2],C=c)
+EXAMPLE:  example Quad; shows an example"
+{
+  int i,j;
+  list Q1, Q2, Q3, Q4, l;
+  poly P1,P2,P3,P4;
+  for (i=1; i<=size(d); i++)
+    {
+      Q1[i] = "IND";
+      Q2[i] = "IND";
+      Q3[i] = "IND";
+      Q4[i] = "IND";
+    }
+  if (size(C) != 0)
+    {
+      for (i=1; i<=size(C); i++)
+	{
+	  j = C[i];
+	  Q1[j]=c[i]; Q2[j]=c[i];
+	  Q3[j]=c[i]; Q4[j]=c[i];
+	}
+    }
+  for (i=1; i<=size(B); i++)
+    {
+      j = B[i];
+      l = b[1];
+      Q1[j] = l[i]; Q3[j] = l[i];
+      l = b[2];
+      Q2[j] = l[i]; Q4[j] = l[i];
+    }
+  for (i=1; i<=size(A); i++)
+    {
+      j = A[i];
+      l = a[1];
+      Q1[j] = l[i]; Q4[j] = l[i];
+      l = a[2];
+      Q2[j] = l[i]; Q3[j] = l[i];
+    }
+  P1 = Prob(Q1,d);
+  P2 = Prob(Q2,d);
+  P3 = Prob(Q3,d);
+  P4 = Prob(Q4,d);
+  return(P1*P2 - P3*P4);
+}
+example
+{
+  "EXAMPLE:"; echo = 2;
+  /* Computes the probability P(X1=1,X2=1,X3=1)*P(X1=2,X2=2,X3=1)
+     -P(X1=2,X2=1,X3=1)*P(X1=1,X2=2,X3=1) */
+  intvec d = 2,2,2;
+  def pdR = probring(d);
+  setring pdR;
+  list A,B,C;
+  list a,b,c;
+  A = list(1);
+  B = list(2);
+  C = list(3);
+  a[1] = levels(d[1]);
+  b[1] = levels(d[2]);
+  c[1] = levels(d[3]);
+  a = Pairs(cartesian(a));
+  b = Pairs(cartesian(b));
+  c = cartesian(c);
+  Quad(A,a[1],B,b[1],C,c[1],d);
+}
+
+/* This procedure computes the list of all quadrics associated to the
+   probability of the event P(A,B,C) */
+
+proc StatementQuadrics (list A, list B, list C, intvec d)
+"USAGE:   StatementQuadrics(A,B,C,d); A list, B list, C list, d intvec
+RETURN:   poly: the list of all quadrics associated to the conditional independence statement, A is independent of B given C
+EXAMPLE:  example StatementQuadrics; shows an example"
+{
+  int i,j,k;
+  list a,b,c,result;
+  for (i=1; i<=size(A); i++)
+    {
+      a[i] = levels(d[A[i]]);
+    }
+  a = Pairs(cartesian(a)); 
+  for (i=1; i<=size(B); i++)
+    {
+      b[i] = levels(d[B[i]]);
+    }
+  b = Pairs(cartesian(b)); 
+  if (size(C) == 0)
+    {
+      for (i=1; i<=size(a); i++)
+	{
+	  for (j=1; j<=size(b); j++)
+	    {
+	      result = insert(result, Quad(A, a[i], B, b[j], C, list(), d), size(result));
+	    }
+	}
+    }
+  else
+    {
+      for (i=1; i<=size(C); i++)
+	{
+	  c[i] = levels(d[C[i]]);
+	}
+      c = cartesian(c);
+      for (k=1; k<=size(c); k++)
+	{
+	  for (i=1; i<=size(a); i++)
+	    {
+	      for (j=1; j<=size(b); j++)
+		{
+		  result = insert(result, Quad(A, a[i], B, b[j], C, c[k], d), size(result));
+		}
+	    }
+	}
+    }
+  return(result);
+}
+example
+{
+  "EXAMPLE:"; echo = 2;
+  /* Lists all quadrics associated to the conditional independence statement, X1 is independent of X2 given X3 */
+  intvec d = 2,2,2;
+  def pdR = probring(d);
+  setring pdR;
+  StatementQuadrics(list(1),list(2),list(3),d);
+}
+
+proc MarkovIdeal (list L, intvec d)
+"USAGE:   MarkovIdeal(L,d); L list, d intvec
+RETURN:   ideal: the ideal of the independence model given by L
+EXAMPLE:  example MarkovIdeal; shows an example"
+{
+  option(redSB);
+  int i,j;
+  ideal result;
+  list l,genlist;
+  for (i=1; i<=size(L); i++)
+    {
+      l = L[i];
+      genlist = StatementQuadrics(l[1],l[2],l[3],d);
+      for (j=1; j<=size(genlist); j++)
+	{
+	  result = result,genlist[j];
+	}
+      result = interred(result);
+    }
+  //  result = groebner(result);
+  return(result);
+}
+example
+{
+  "EXAMPLE:"; 
+  echo = 2;
+  intvec d = 2,2,2,2; int n = size(d);
+  def pdR = probring(d);
+  setring pdR;
+  intvec v15 = 1,1,0,0,1,1; 
+  intmat m15 = bnet(n,v15); 
+  list l15 = localMarkov(m15);
+  list pw15 = pairMarkov(m15);
+  list g15 = globalMarkov(m15);
+  ideal I15 = MarkovIdeal(l15,d); 
+  info(I15);
+  ideal G15 = MarkovIdeal(g15,d); 
+  info(G15);
+  quotient(I15,G15);
+  ideal T15 = torideal(I15,d); 
+  quotient(I15,T15);
+  ideal Q15 = sat(I15,T15)[1];
+  list pd15 = primdecGTZ(Q15);
+  info(T15)[1];
+  for (int i=1; i<=size(pd15); i++)
+    {
+      info(std(pd15[i][1]))[1];
+    }
+}
+
+proc torideal (ideal I, intvec d)
+"USAGE:   torideal(I,d); I ideal, d intvec
+RETURN:   ideal: I:p@math{^\infty} where p is the product of all the linear forms
+@*For example, if d=2,2,2, then p=p111*...p222*p+11*...p+22*p++1*p++2
+EXAMPLE:  example torideal; shows an example"
+{
+  list l,f;
+  int i,j;
+  ideal t = I;
+  for (i=1; i<=size(d); i++)
+    {
+      for (j=1; j<i; j++)
+	{
+	  l[j] = "IND";
+	}
+      for (j=i; j<=size(d); j++)
+	{
+	  l[j] = levels(d[j]);
+	}
+      f = f + cartesian(l);
+    }  
+  for (i=1; i<=size(f); i++)
+    {
+      t = sat(t,Prob(f[i],d))[1];
+    }
+  return(t);
+}
+example
+{
+  "EXAMPLE:"; echo = 2;
+  intvec d = 2,2,2,2; int n = size(d);
+  def pdR = probring(d);
+  setring pdR;
+  intvec v = 1,1,0,0,1,1; 
+  intmat m = bnet(n,v); 
+  list l = localMarkov(m);
+  ideal I = MarkovIdeal(l,d); 
+  ideal T = torideal(I,d); 
+}
+
+// This procedure computes the toric ideal after linear change
+// on the first random variable.
+proc torideal1 (ideal I, intvec d)
+{
+  list l,f;
+  int i,j;
+  ideal t = I;
+  for (i=2; i<=size(d); i++)
+    {
+      for (j=2; j<i; j++)
+	{
+	  l[j] = "IND";
+	}
+      for (j=i; j<=size(d); j++)
+	{
+	  l[j] = levels(d[j]);
+	}
+      l[1] = 1;
+      f = f + cartesian(l);
+    }  
+  for (i=1; i<=size(f); i++)
+    {
+      t = sat(t,Prob(f[i],d))[1];
+    }
+  return(t);
+}
+
+// This procedure computes the toric ideal of a graph not written
+// in topological order.
+proc torideal2 (ideal I, intvec d)
+{
+  list l;
+  int i;
+  ideal t = I;
+  for (i=1; i<=size(d); i++)
+    {
+      l[i] = levels(d[i]);
+      l[i] = insert(l[i], "IND", size(l[i]));
+    }
+  l = cartesian(l);
+  l = delete(l,size(l));
+  for (i=1; i<=size(l); i++)
+    {
+      t = sat(t,Prob(l[i],d))[1];
+    }
+  return(t);
+}
+
+proc proj (ideal I, list #)
+{
+  list pols, mons;
+  poly p; 
+  poly m = 1;
+  ideal wv;
+  ideal J = I;
+  ideal quad = degreepart(shortid(J,2),2,2);
+  while (size(quad) > 0)
+    {
+      p = quad[1];
+      pols = insert(pols,p);
+      wv = findvars(lead(p));
+      m = m*wv[1];
+      mons = insert(mons,wv[2]);
+      if (size(#) == 0)
+	{
+	  J = eliminate(J,wv[1]);
+	}
+      else
+	{
+	  J = fastelim(J,wv[1]);
+	}
+      quad = degreepart(shortid(J,2),2,2);
+    }
+  return(J,m,pols,mons);
+}
+
+proc fiber (ideal I, list pols, list mons)
+{
+  ideal J = I;
+  int i;
+  for (i=1; i<=size(mons); i++)
+    {
+      J = sat(J+pols[i],mons[i])[1];
+    }
+  return (J);
+}
+
+proc primdecGSS (ideal I, ideal T)
+{
+  list components;
+  ideal K = reduce(T,std(I));
+  K = K + 0;
+  ideal Q;
+  int c;
+  for (c=1; c<=size(K); c++)
+    {
+      Q = sat(I,K[c])[1];
+      if (size(Q) > 1)
+	{
+	  components = insert(components,Q);
+	}
+    }
+  return (components);
+}
+
+proc hidden_preimage (ideal T, intvec d)
+{
+  def t_ring = basering;
+  intvec d2 = d[1..size(d)-1];
+  probring(d2, "h_ring", "p", "dp");
+  setring t_ring;
+  int i,l;
+  string s;
+  poly form;
+  ideal phi;
+  for (i=1;i<=nvars(h_ring);i++)
+    {
+      s = "form = ";
+      for (l=1; l<=d[size(d)]; l++)
+	{
+	  s = s , varstr(h_ring,i) + string(l);
+	  if (l<d[size(d)])
+	    {
+	      s = s , "+";
+	    }
+	}
+      execute(s);
+      phi = phi,form;
+    }
+  phi = phi+0;
+  map Phi = h_ring,phi;
+  setring h_ring;
+  ideal Q = preimage(t_ring, Phi, T);
+  keepring h_ring;
+}
+
+proc hidden_elim (ideal T, intvec d, string s)
+{
+  poly m = product(maxideal(1));
+  def b_ring = basering;
+  intvec d2 = d[1..size(d)-1];
+  probring(d2, s, "p", "dp");
+  def t_ring = `s` + b_ring;
+  setring t_ring;
+  int i,l;
+  string ss;
+  poly form;
+  ideal J;
+  for (i=1;i<=nvars(`s`);i++)
+    {
+      ss = "form = ";
+      for (l=1; l<=d[size(d)]; l++)
+	{
+	  ss = ss , varstr(`s`,i) + string(l);
+	  if (l<d[size(d)])
+	    {
+	      ss = ss , "+";
+	    }
+	}
+      execute(ss);
+      J = J, var(i) - form;
+    }
+  ideal T = imap(b_ring, T);
+  poly m = imap(b_ring, m);
+  J = J+T;
+  ideal Q = eliminate(J,m);
+  setring `s`;
+  ideal Q = imap (t_ring, Q);
+  keepring `s`;
+}
+
+proc map_observable (def H, intvec d, int r)
+"USAGE:   map_observable(H,d,r); H ring, d intvec, r int
+RETURN:   map: the ring map from H to basering induced by the inclusion of H in basering
+@*It is assumed that H is the ring generated by the indeterminates that represent the observable probability distribution @math{P(X_1,\cdots,X_r)}
+while basering is generated by the indeterminates for the probability distribution @math{P(X_1,\cdots,X_n)} where r < n.
+Each variable in H is mapped to the marginalization over the hidden variables in basering.
+EXAMPLE:  example map_observable; shows an example"
+{
+  int n = size(d);
+  int i,j;
+  intvec idx;
+  list f;
+  string s;
+  poly form;
+  ideal phi;
+  for (i=1;i<=r;i++)
+    {
+      idx[i]=1;
+    }
+  for (i=1;i<=nvars(H);i++)
+    {
+      s = "form = ";
+      for (j=1;j<=r;j++)
+        {
+          f[j] = idx[j];
+        }
+      for (j=r+1;j<=n;j++)
+        {
+          f[j] = "IND";
+        }
+      s = s, string(Prob(f,d));
+      idx = next(idx, size(d2), d2);
+      execute(s);
+      phi = phi,form;
+    }
+  phi = phi+0;
+  map Phi = H,phi;
+  return (Phi);
+} 
+example
+{
+  "EXAMPLE:"; echo = 2;
+  /* Computes the polynomial constraints for the Bayesian network X1 <- X3 -> X2 
+  where X1 and X2 are observable and X3 is hidden. */
+  intvec d = 3,3,2;
+  int n = size(d);
+  int r = 2;
+  def pdR = probring(d);
+  intvec d2 = d[1..r];
+  def H = probring(d2);
+  setring pdR;
+  def Phi = map_observable(H, d, r);
+  Phi;
+  intvec v = 0,1,1;
+  intmat m = bnet(n,v); 
+  list g = globalMarkov(m);
+  ideal G = MarkovIdeal(g,d); 
+  ideal T = torideal(G,d);
+  setring H;
+  ideal Q = preimage(pdR,Phi,T);
+  Q;
+}

@@ -1,0 +1,83 @@
+LIB "/home/galuis/graphical-models/singular/Markov.lib";
+
+intvec d = 3,3,4; int n = size(d);
+def pdR = probring(d);
+intvec d2 = d[1..size(d)-1];
+def H = probring(d2);
+setring pdR;
+int i,l;
+string s;
+poly form;
+ideal phi;
+for (i=1;i<=nvars(H);i++)
+{
+   s = "form = ";
+   for (l=1; l<=d[n]; l++)
+   {
+     s = s , varstr(H,i) + string(l);
+     if (l<d[n])
+      {
+        s = s , "+";
+      }
+   }
+   execute(s);
+   phi = phi,form;
+}
+phi = phi+0;
+map Phi = H,phi;
+
+/////////////////////////////////////////////////////////////////
+
+setring pdR;
+intvec v1 = 0,0,0; intmat m1 = bnet(n,v1); 
+list g1 = globalMarkov(m1);
+ideal G1 = MarkovIdeal(g1,d); 
+ideal T1 = torideal(G1,d);
+setring H;
+ideal Q1 = preimage(pdR,Phi,T1);
+Q1;
+
+
+////////////////////////////////////////////////////////////////
+
+setring pdR;
+intvec v2 = 0,0,1; intmat m2 = bnet(n,v2); 
+list g2 = globalMarkov(m2);
+ideal G2 = MarkovIdeal(g2,d); 
+ideal T2 = torideal(G2,d);
+setring H;
+ideal Q2 = preimage(pdR,Phi,T2);
+Q2;
+
+////////////////////////////////////////////////////////////////
+
+setring pdR;
+intvec v3 = 1,0,1; intmat m3 = bnet(n,v3); 
+list g3 = globalMarkov(m3);
+ideal G3 = MarkovIdeal(g3,d); 
+ideal T3 = torideal(G3,d);
+setring H;
+ideal Q3 = preimage(pdR,Phi,T3);
+Q3;
+
+////////////////////////////////////////////////////////////////
+
+setring pdR;
+intvec v4 = 0,1,1; intmat m4 = bnet(n,v4); 
+list g4 = globalMarkov(m4);
+ideal G4 = MarkovIdeal(g4,d); 
+ideal T4 = torideal(G4,d);
+setring H;
+ideal Q4 = preimage(pdR,Phi,T4);
+Q4;
+
+////////////////////////////////////////////////////////////////
+
+setring pdR;
+intvec v5 = 1,1,0; intmat m5 = bnet(n,v5); 
+list g5 = globalMarkov(m5);
+ideal G5 = MarkovIdeal(g5,d); 
+ideal T5 = torideal(G5,d);
+setring H;
+ideal Q5 = preimage(pdR,Phi,T5);
+Q5;
